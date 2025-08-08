@@ -1,0 +1,209 @@
+<div class="upload-container">
+  <h1 class="title">🤖 AI Document Assistant</h1>
+
+  <!-- Tab Navigation -->
+  <div class="tab-navigation">
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'upload'"
+      (click)="setActiveTab('upload')">
+      📄 Dokument Upload
+    </button>
+    <button 
+      class="tab-button" 
+      [class.active]="activeTab === 'text'"
+      (click)="setActiveTab('text')">
+      ✍️ Text Analyse
+    </button>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content">
+    
+    <!-- Datei-Upload Tab -->
+    <div class="tab-panel" *ngIf="activeTab === 'upload'">
+      <div class="upload-card">
+        <h2>📄 Dokument hochladen</h2>
+        <p class="tab-description">Laden Sie PDF, DOC, TXT oder andere Dokumente hoch für eine automatische Analyse.</p>
+        
+        <input 
+          type="file" 
+          class="file-input" 
+          (change)="onFileSelected($event)"
+          accept=".pdf,.txt,.doc,.docx,.csv,.json,.md"
+          #fileInput>
+        
+        <div class="file-info" *ngIf="selectedFile">
+          <div class="file-details">
+            <span class="file-name">📎 {{ selectedFile.name }}</span>
+            <span class="file-size" [class.error]="selectedFile.size === 0">
+              {{ formatFileSize(selectedFile.size) }}
+            </span>
+            <span class="file-type">{{ getFileTypeDisplay(selectedFile.type) }}</span>
+          </div>
+          <div class="file-status" *ngIf="selectedFile.size === 0" class="warning">
+            ⚠️ Warnung: Datei scheint leer zu sein
+          </div>
+          <div class="file-actions">
+            <button class="clear-btn" (click)="clearFile(fileInput)">
+              🗑️ Datei entfernen
+            </button>
+          </div>
+        </div>
+
+        <div class="upload-buttons">
+          <button 
+            class="upload-btn" 
+            (click)="uploadDocument()" 
+            [disabled]="!selectedFile || isProcessing || selectedFile.size === 0">
+            {{ isProcessing ? '⏳ Analysiere...' : '🚀 Dokument analysieren' }}
+          </button>
+        </div>
+
+        <!-- Unterstützte Formate Info -->
+        <div class="supported-formats">
+          <h4>📋 Unterstützte Formate:</h4>
+          <div class="format-tags">
+            <span class="format-tag">PDF</span>
+            <span class="format-tag">TXT</span>
+            <span class="format-tag">DOC</span>
+            <span class="format-tag">DOCX</span>
+            <span class="format-tag">CSV</span>
+            <span class="format-tag">JSON</span>
+            <span class="format-tag">MD</span>
+          </div>
+          <p class="format-note">Maximale Dateigröße: 10 MB</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Text-Analyse Tab -->
+    <div class="tab-panel" *ngIf="activeTab === 'text'">
+      <div class="upload-card">
+        <h2>✍️ Text direkt analysieren</h2>
+        <p class="tab-description">Fügen Sie Text direkt ein für eine sofortige Analyse ohne Datei-Upload.</p>
+        
+        <textarea 
+          class="text-input" 
+          [(ngModel)]="inputText" 
+          placeholder="Fügen Sie hier Ihren Text ein, den Sie analysieren möchten...
+
+Beispiele:
+• Technische Dokumentation
+• Projektbeschreibungen  
+• Anforderungsdokumente
+• Code-Kommentare
+• Meeting-Notizen"
+          maxlength="5000">
+        </textarea>
+        
+        <div class="text-info">
+          <div class="char-counter" [class.warning]="inputText.length > 4500">
+            {{ inputText.length }}/5000 Zeichen
+          </div>
+          <div class="text-actions">
+            <button class="clear-btn" (click)="clearText()" *ngIf="inputText.length > 0">
+              🗑️ Text löschen
+            </button>
+            <button class="sample-btn" (click)="loadSampleText()">
+              📝 Beispieltext laden
+            </button>
+          </div>
+        </div>
+
+        <button 
+          class="upload-btn" 
+          (click)="analyzeText()" 
+          [disabled]="!inputText.trim() || isProcessing">
+          {{ isProcessing ? '⏳ Analysiere...' : '🔍 Text analysieren' }}
+        </button>
+
+        <!-- Text-Analyse Features -->
+        <div class="text-features">
+          <h4>🔍 Text-Analyse Features:</h4>
+          <ul>
+            <li>📝 Automatische Zusammenfassung</li>
+            <li>🔍 Schlüsselwort-Extraktion</li>
+            <li>💻 Technologie-Empfehlungen</li>
+            <li>📊 Sentiment-Analyse</li>
+            <li>🎯 Komplexitätsbewertung</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fortschritt (für beide Tabs) -->
+  <div class="progress-section" *ngIf="isProcessing">
+    <h3>🔄 Analyse läuft...</h3>
+    <p>Bitte warten Sie, während {{ activeTab === 'upload' ? 'Ihr Dokument' : 'Ihr Text' }} analysiert wird.</p>
+    <div class="progress-bar">
+      <div class="progress-fill"></div>
+    </div>
+  </div>
+
+  <!-- Fehler-Anzeige (für beide Tabs) -->
+  <div class="error-card" *ngIf="uploadError">
+    <div class="error-content">
+      <strong>❌ Fehler:</strong>
+      <p>{{ uploadError }}</p>
+      <button class="retry-btn" (click)="clearError()">🔄 Erneut versuchen</button>
+    </div>
+  </div>
+
+  <!-- Analyse-Ergebnisse (für beide Tabs) -->
+  <div class="results-section" *ngIf="analysisResult && !isProcessing">
+    <div class="results-header">
+      <h3>📊 Analyse-Ergebnis</h3>
+      <div class="result-source">
+        <span class="source-badge" *ngIf="activeTab === 'upload'">📄 Dokument</span>
+        <span class="source-badge" *ngIf="activeTab === 'text'">✍️ Text</span>
+      </div>
+    </div>
+
+    <!-- Zusammenfassung -->
+    <div class="result-card" *ngIf="analysisResult.summary">
+      <h4>📝 Zusammenfassung</h4>
+      <p>{{ analysisResult.summary }}</p>
+    </div>
+
+    <!-- Schlüsselwörter -->
+    <div class="result-card" *ngIf="analysisResult.keywords?.length">
+      <h4>🔍 Schlüsselwörter</h4>
+      <div class="keyword-tags">
+        <span class="keyword-tag" *ngFor="let keyword of analysisResult.keywords">{{ keyword }}</span>
+      </div>
+    </div>
+
+    <!-- Technologie-Empfehlungen -->
+    <div class="result-card" *ngIf="analysisResult.suggestedComponents?.length">
+      <h4>💻 Technologie-Empfehlungen</h4>
+      <div class="tech-recommendations">
+        <span class="tech-tag" *ngFor="let tech of analysisResult.suggestedComponents">{{ tech }}</span>
+      </div>
+    </div>
+
+    <!-- Einfaches Feedback -->
+    <div class="simple-feedback">
+      <h4>💬 War diese Analyse hilfreich?</h4>
+      <div class="feedback-buttons">
+        <button class="btn-helpful" (click)="submitQuickFeedback(true)">
+          👍 Ja, hilfreich
+        </button>
+        <button class="btn-not-helpful" (click)="submitQuickFeedback(false)">
+          👎 Nicht hilfreich
+        </button>
+      </div>
+    </div>
+
+    <!-- Aktionen -->
+    <div class="result-actions">
+      <button class="action-btn" (click)="exportResults()">
+        💾 Ergebnis exportieren
+      </button>
+      <button class="action-btn" (click)="startNewAnalysis()">
+        🔄 Neue Analyse
+      </button>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,40 @@
+services:
+  # Backend Service - Simplified name: ai-docs-assist.onrender.com
+  - type: web
+    name: ai-docs-assist
+    env: java
+    buildCommand: cd backend && mvn clean package -DskipTests
+    startCommand: cd backend && java -Dserver.port=$PORT -jar target/ai-doc-assist-0.0.1-SNAPSHOT.jar
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://ai-docs-assist-demo.onrender.com
+      - key: API_FRONTEND_ORIGIN
+        value: https://ai-docs-assist-demo.onrender.com
+      - key: OPENAI_API_KEY
+        sync: false  # Set this manually in Render dashboard
+      - key: OPENAI_MODEL
+        value: gpt-3.5-turbo
+      - key: OPENAI_MAX_TOKENS
+        value: 500
+      - key: OPENAI_TEMPERATURE
+        value: 0.3
+      - key: DEMO_MODE
+        value: true
+      - key: DEMO_MOCK_AI
+        value: false
+      - key: MAX_FILE_SIZE
+        value: 10MB
+      - key: LOG_LEVEL
+        value: DEBUG
+
+  # Frontend Service - Simplified name: ai-docs-assist-demo.onrender.com
+  - type: web
+    name: ai-docs-assist-demo
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: API_BACKEND_URL
+        value: https://ai-docs-assist.onrender.com

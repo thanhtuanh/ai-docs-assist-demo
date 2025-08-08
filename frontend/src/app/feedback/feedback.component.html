@@ -1,0 +1,435 @@
+<div class="feedback-container" *ngIf="analysisResult && !feedbackSubmitted">
+
+    <!-- Schnelles Feedback -->
+    <div class="quick-feedback-section">
+        <h3>💬 War diese Analyse hilfreich?</h3>
+
+        <!-- Zusammenfassung -->
+        <div class="feedback-item">
+            <div class="feedback-content">
+                <strong>📝 Zusammenfassung:</strong>
+                <p>{{ analysisResult.summary }}</p>
+            </div>
+            <div class="quick-buttons">
+                <button class="btn-helpful" (click)="submitQuickFeedback('summary', true)">
+                    👍 Hilfreich
+                </button>
+                <button class="btn-not-helpful" (click)="submitQuickFeedback('summary', false)">
+                    👎 Nicht hilfreich
+                </button>
+            </div>
+        </div>
+
+        <!-- Schlüsselwörter -->
+        <div class="feedback-item">
+            <div class="feedback-content">
+                <strong>🔍 Schlüsselwörter:</strong>
+                <p>{{ analysisResult.keywords }}</p>
+            </div>
+            <div class="quick-buttons">
+                <button class="btn-helpful" (click)="submitQuickFeedback('keywords', true)">
+                    👍 Hilfreich
+                </button>
+                <button class="btn-not-helpful" (click)="submitQuickFeedback('keywords', false)">
+                    👎 Nicht hilfreich
+                </button>
+            </div>
+        </div>
+
+        <!-- Technologie-Empfehlungen -->
+        <div class="feedback-item">
+            <div class="feedback-content">
+                <strong>💻 Technologie-Empfehlungen:</strong>
+                <p>{{ analysisResult.suggestedComponents }}</p>
+            </div>
+            <div class="quick-buttons">
+                <button class="btn-helpful" (click)="submitQuickFeedback('components', true)">
+                    👍 Hilfreich
+                </button>
+                <button class="btn-not-helpful" (click)="submitQuickFeedback('components', false)">
+                    👎 Nicht hilfreich
+                </button>
+            </div>
+        </div>
+
+        <!-- Detailliertes Feedback Toggle -->
+        <div class="detailed-feedback-toggle">
+            <button class="btn-toggle" (click)="showDetailedFeedback = !showDetailedFeedback">
+                {{ showDetailedFeedback ? '📄 Einfaches Feedback' : '⭐ Detailliertes Feedback' }}
+            </button>
+        </div>
+    </div>
+
+    <!-- Detailliertes Feedback -->
+    <div class="detailed-feedback-section" *ngIf="showDetailedFeedback">
+        <h3>⭐ Detaillierte Bewertung</h3>
+
+        <form (ngSubmit)="submitDetailedFeedback()" #feedbackForm="ngForm">
+
+            <!-- Sterne-Bewertungen -->
+            <div class="rating-section">
+
+                <!-- Zusammenfassung Rating -->
+                <div class="rating-item">
+                    <label>📝 Qualität der Zusammenfassung:</label>
+                    <div class="stars">
+                        <span *ngFor="let star of getStarsArray(5); let i = index" class="star"
+                            [class.filled]="i < (feedback.summaryRating || 0)" (click)="setRating('summary', i + 1)">
+                            ⭐
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Keywords Rating -->
+                <div class="rating-item">
+                    <label>🔍 Relevanz der Schlüsselwörter:</label>
+                    <div class="stars">
+                        <span *ngFor="let star of getStarsArray(5); let i = index" class="star"
+                            [class.filled]="i < (feedback.keywordsRating || 0)" (click)="setRating('keywords', i + 1)">
+                            ⭐
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Components Rating -->
+                <div class="rating-item">
+                    <label>💻 Qualität der Technologie-Empfehlungen:</label>
+                    <div class="stars">
+                        <span *ngFor="let star of getStarsArray(5); let i = index" class="star"
+                            [class.filled]="i < (feedback.componentsRating || 0)"
+                            (click)="setRating('components', i + 1)">
+                            ⭐
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Overall Rating -->
+                <div class="rating-item overall-rating">
+                    <label>🎯 Gesamtbewertung:</label>
+                    <div class="stars">
+                        <span *ngFor="let star of getStarsArray(5); let i = index" class="star large"
+                            [class.filled]="i < (feedback.overallRating || 0)" (click)="setRating('overall', i + 1)">
+                            ⭐
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Textuelle Kommentare -->
+            <div class="comments-section">
+                <div class="comment-item">
+                    <label for="userComments">💬 Allgemeine Kommentare:</label>
+                    <textarea id="userComments" [(ngModel)]="feedback.userComments" name="userComments"
+                        placeholder="Was können wir verbessern? Was hat Ihnen gefallen?" rows="3"></textarea>
+                </div>
+
+                <div class="comment-item">
+                    <label for="suggestedSummary">📝 Bessere Zusammenfassung vorschlagen:</label>
+                    <textarea id="suggestedSummary" [(ngModel)]="feedback.suggestedSummary" name="suggestedSummary"
+                        placeholder="Wie würden Sie das Dokument zusammenfassen?" rows="2"></textarea>
+                </div>
+
+                <div class="comment-item">
+                    <label for="suggestedComponents">💻 Andere Technologien vorschlagen:</label>
+                    <textarea id="suggestedComponents" [(ngModel)]="feedback.suggestedComponents"
+                        name="suggestedComponents" placeholder="Welche Technologien würden Sie empfehlen?"
+                        rows="2"></textarea>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="submit-section">
+                <button type="submit" class="btn-submit" [disabled]="isSubmitting">
+                    <span *ngIf="!isSubmitting">📤 Feedback senden</span>
+                    <span *ngIf="isSubmitting">⏳ Wird gesendet...</span>
+                </button>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<!-- Erfolgsmeldung -->
+<div class="feedback-success" *ngIf="feedbackSubmitted">
+    <div class="success-message">
+        <h3>✅ Vielen Dank für Ihr Feedback!</h3>
+        <p>Ihre Bewertung hilft uns, die KI-Analyse kontinuierlich zu verbessern.</p>
+    </div>
+</div>
+
+<style>
+    /* CSS für Feedback-Component */
+    .feedback-container {
+        margin-top: 20px;
+        padding: 20px;
+        background: #f9f9f9;
+        border-radius: 8px;
+        border-left: 4px solid #007bff;
+    }
+
+    .quick-feedback-section h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.2rem;
+    }
+
+    .feedback-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: white;
+        border-radius: 6px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .feedback-content {
+        flex: 1;
+        margin-right: 15px;
+    }
+
+    .feedback-content strong {
+        display: block;
+        margin-bottom: 5px;
+        color: #555;
+    }
+
+    .feedback-content p {
+        margin: 0;
+        line-height: 1.5;
+        color: #666;
+    }
+
+    .quick-buttons {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .btn-helpful,
+    .btn-not-helpful {
+        padding: 8px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .btn-helpful {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-helpful:hover {
+        background: #218838;
+    }
+
+    .btn-not-helpful {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-not-helpful:hover {
+        background: #c82333;
+    }
+
+    .detailed-feedback-toggle {
+        text-align: center;
+        margin-top: 20px;
+        padding-top: 15px;
+        border-top: 1px solid #ddd;
+    }
+
+    .btn-toggle {
+        background: #6c757d;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+    }
+
+    .btn-toggle:hover {
+        background: #5a6268;
+    }
+
+    .detailed-feedback-section {
+        margin-top: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+    }
+
+    .detailed-feedback-section h3 {
+        color: #333;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .rating-section {
+        margin-bottom: 25px;
+    }
+
+    .rating-item {
+        margin-bottom: 15px;
+    }
+
+    .rating-item label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #555;
+    }
+
+    .stars {
+        display: flex;
+        gap: 5px;
+    }
+
+    .star {
+        cursor: pointer;
+        font-size: 1.5rem;
+        transition: all 0.2s;
+        filter: grayscale(100%);
+    }
+
+    .star.filled {
+        filter: grayscale(0%);
+    }
+
+    .star.large {
+        font-size: 2rem;
+    }
+
+    .star:hover {
+        transform: scale(1.1);
+    }
+
+    .overall-rating {
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+        margin-top: 20px;
+    }
+
+    .comments-section {
+        margin-bottom: 25px;
+    }
+
+    .comment-item {
+        margin-bottom: 15px;
+    }
+
+    .comment-item label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: #555;
+    }
+
+    .comment-item textarea {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: inherit;
+        font-size: 0.9rem;
+        resize: vertical;
+    }
+
+    .comment-item textarea:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    }
+
+    .submit-section {
+        text-align: center;
+    }
+
+    .btn-submit {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 500;
+        transition: all 0.2s;
+    }
+
+    .btn-submit:hover:not(:disabled) {
+        background: #0056b3;
+    }
+
+    .btn-submit:disabled {
+        background: #6c757d;
+        cursor: not-allowed;
+    }
+
+    .feedback-success {
+        margin-top: 20px;
+        padding: 20px;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 6px;
+        text-align: center;
+    }
+
+    .success-message h3 {
+        color: #155724;
+        margin-bottom: 10px;
+    }
+
+    .success-message p {
+        color: #155724;
+        margin: 0;
+    }
+
+    .temporary-message {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        z-index: 1000;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .feedback-item {
+            flex-direction: column;
+        }
+
+        .feedback-content {
+            margin-right: 0;
+            margin-bottom: 10px;
+        }
+
+        .quick-buttons {
+            justify-content: center;
+        }
+    }
+</style>

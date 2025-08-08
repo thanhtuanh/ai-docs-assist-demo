@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <title>AI Document Assistant - Intelligente Dokumentenanalyse</title>
+    <base href="/">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Favicon Links -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="manifest" href="site.webmanifest">
+    
+    <!-- Meta Tags -->
+    <meta name="description" content="AI-powered document analysis tool for intelligent text processing, keyword extraction, and technology recommendations.">
+    <meta name="keywords" content="AI, document analysis, text processing, machine learning, NLP, Dokumentenanalyse">
+    <meta name="author" content="AI Document Assistant">
+    <meta name="theme-color" content="#007bff">
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="AI Document Assistant">
+    <meta property="og:description" content="Intelligente Dokumentenanalyse mit KI-Unterstützung">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="favicon-192x192.png">
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="AI Document Assistant">
+    <meta name="twitter:description" content="Intelligente Dokumentenanalyse mit KI-Unterstützung">
+    <meta name="twitter:image" content="favicon-192x192.png">
+    
+    <!-- ✅ URL-Redirect für neue Domain-Namen -->
+    <script>
+        // Redirect von alten Domain-Namen zu neuen
+        const hostname = window.location.hostname;
+        
+        // Alte Frontend-Domains zu neuer Domain
+        if (hostname === 'bits-ai-docs-assist-frontend.onrender.com' || 
+            hostname === 'bits-ai-docs-assits-demo.onrender.com') {
+            window.location.replace('https://ai-docs-assist-demo.onrender.com' + 
+                                   window.location.pathname + 
+                                   window.location.search);
+        }
+        
+        // Alte Backend-Domain zu neuer Domain (falls jemand direkt zugreift)
+        if (hostname === 'bits-ai-docs-assist-backend.onrender.com') {
+            window.location.replace('https://ai-docs-assist.onrender.com' + 
+                                   window.location.pathname + 
+                                   window.location.search);
+        }
+    </script>
+</head>
+<body>
+    <app-root></app-root>
+</body>
+</html>
