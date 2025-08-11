@@ -13,10 +13,9 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(csrf -> csrf.disable())
-            .cors()  // verwendet CorsConfig
-            .and()
+            .cors(cors -> cors.disable())  // Updated for Spring Security 6.x
             .authorizeHttpRequests(authz -> authz
-                .antMatchers("/api/**").permitAll()
+                .requestMatchers("/api/**").permitAll()  // Updated from antMatchers
                 .anyRequest().permitAll()
             );
         return http.build();

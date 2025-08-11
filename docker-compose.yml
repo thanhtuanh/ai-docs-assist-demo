@@ -1,23 +1,25 @@
-
 services:
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: ai-doc-assist-backend
     ports:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - CORS_ALLOWED_ORIGIN=http://localhost:4200
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DEBUG_API_KEY=${OPENAI_API_KEY}
+      - CORS_ALLOWED_ORIGIN=http://localhost:4200,http://frontend
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
+      - DEBUG_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
       - OPENAI_MODEL=gpt-3.5-turbo
-      -  JAVA_OPTS=-Xmx1024m
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - JAVA_OPTS=-Xmx1024m -Xms512m
+      - SERVER_PORT=8080
+      - LOGGING_LEVEL_ROOT=INFO
+      - LOGGING_LEVEL_COM_BITS=DEBUG
+    volumes:
+      - ./backend/logs:/app/logs
+      - backend-data:/app/data
+    restart: unless-stopped
     networks:
       - app-network
 
@@ -25,13 +27,45 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    container_name: ai-doc-assist-frontend
     ports:
       - "4200:80"
+    environment:
+      - NODE_ENV=production
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
     networks:
       - app-network
+
+  # Optional: Database service (if needed)
+  # database:
+  #   image: postgres:15-alpine
+  #   container_name: ai-doc-assist-db
+  #   environment:
+  #     - POSTGRES_DB=aidocassist
+  #     - POSTGRES_USER=aidocassist
+  #     - POSTGRES_PASSWORD=password
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   networks:
+  #     - app-network
+
+volumes:
+  backend-data:
+    driver: local
+  # postgres-data:
+  #   driver: local
 
 networks:
   app-network:
     driver: bridge
+    name: ai-doc-assist-network

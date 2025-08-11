@@ -56,20 +56,13 @@
         <textarea 
           class="text-input" 
           [(ngModel)]="inputText" 
-          placeholder="Fügen Sie hier Ihren Text ein, den Sie analysieren möchten...
-
-Beispiele:
-• Technische Dokumentation
-• Projektbeschreibungen  
-• Anforderungsdokumente
-• Code-Kommentare
-• Meeting-Notizen"
-          maxlength="5000">
+          placeholder="Fügen Sie hier Ihren Text ein, den Sie analysieren möchten..."
+          maxlength="15000">
         </textarea>
         
         <div class="text-info">
-          <div class="char-counter" [class.warning]="inputText.length > 4500">
-            {{ inputText.length }}/5000 Zeichen
+          <div class="char-counter" [class.warning]="inputText.length > 14000">
+            {{ inputText.length }}/15000 Zeichen
           </div>
           <div class="text-actions">
             <button class="clear-btn" (click)="clearText()" *ngIf="inputText.length > 0">

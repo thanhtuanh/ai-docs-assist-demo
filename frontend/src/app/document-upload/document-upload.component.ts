@@ -396,29 +396,330 @@ export class DocumentUploadComponent {
 
   // Load sample text for demonstration
   loadSampleText() {
-    this.inputText = `# Projektbeschreibung: E-Commerce Platform
+    this.inputText = `PROJEKTANFRAGE: E-COMMERCE PLATTFORM FÜR PREMIUM LIFESTYLE PRODUKTE
 
-## Überblick
-Entwicklung einer modernen E-Commerce-Plattform mit React Frontend und Node.js Backend.
+Datum: 11. August 2025
+Standort: München, Bayern, Deutschland
+Auftraggeber: Premium Lifestyle GmbH
+Projektleiter: Dr. Sarah Müller
 
-## Technische Anforderungen
-- React.js für das Frontend
-- Node.js mit Express für das Backend
-- MongoDB als Datenbank
-- JWT für Authentifizierung
-- Stripe für Zahlungsabwicklung
+EXECUTIVE SUMMARY
+Die Premium Lifestyle GmbH plant die Entwicklung einer hochmodernen E-Commerce-Plattform für den Verkauf von Premium-Lifestyle-Produkten im deutschsprachigen Raum. Das Projekt soll bis Q2 2026 abgeschlossen werden und eine skalierbare, DSGVO-konforme Lösung bieten.
 
-## Features
-- Produktkatalog mit Suchfunktion
-- Warenkorb und Checkout-Prozess
-- Benutzerverwaltung
-- Admin-Dashboard
-- Responsive Design
+GESCHÄFTSHINTERGRUND
+Unser Unternehmen ist seit 2018 im Premium-Lifestyle-Segment tätig und vertreibt hochwertige Produkte in den Bereichen:
+- Luxus-Wohnaccessoires (Durchschnittspreis: 150-2.500 EUR)
+- Designer-Möbel (Durchschnittspreis: 800-15.000 EUR)
+- Exklusive Kunstobjekte (Durchschnittspreis: 500-25.000 EUR)
+- Premium-Elektronik (Durchschnittspreis: 300-8.000 EUR)
 
-## Zielgruppe
-Kleine bis mittlere Unternehmen, die ihre Produkte online verkaufen möchten.`;
+Aktuell erfolgt der Verkauf hauptsächlich über physische Showrooms in München, Hamburg und Berlin. Der Online-Anteil beträgt nur 15% des Gesamtumsatzes (2024: 3,2 Mio. EUR). Ziel ist es, den Online-Anteil bis 2027 auf 60% zu steigern.
+
+MARKTANALYSE UND ZIELGRUPPE
+Primäre Zielgruppe:
+- Alter: 35-65 Jahre
+- Einkommen: >80.000 EUR/Jahr
+- Wohnort: Großstädte (München, Hamburg, Berlin, Köln, Frankfurt)
+- Affinität zu Premium-Marken und exklusiven Produkten
+- Hohe Erwartungen an Service und Qualität
+
+Sekundäre Zielgruppe:
+- Geschäftskunden (Interior Designer, Architekten)
+- Internationale Kunden (Österreich, Schweiz, Benelux)
+
+TECHNISCHE ANFORDERUNGEN
+
+Frontend-Technologien:
+- React 18+ mit TypeScript für maximale Typsicherheit
+- Next.js 14+ für Server-Side Rendering und SEO-Optimierung
+- Tailwind CSS für responsive Design
+- Framer Motion für Premium-Animationen
+- React Query für effizientes State Management
+
+Backend-Technologien:
+- Node.js 20+ mit Express.js
+- TypeScript für Backend-Entwicklung
+- PostgreSQL als Hauptdatenbank
+- Redis für Caching und Session-Management
+- Elasticsearch für erweiterte Suchfunktionen
+
+Cloud-Infrastruktur:
+- AWS als Cloud-Provider (Frankfurt Region für DSGVO-Compliance)
+- Docker-Container für Microservices-Architektur
+- Kubernetes für Orchestrierung
+- CloudFront CDN für globale Performance
+- S3 für Medien-Storage
+
+FUNKTIONALE ANFORDERUNGEN
+
+Produktkatalog:
+- Hierarchische Kategoriestruktur mit bis zu 5 Ebenen
+- Erweiterte Filteroptionen (Preis, Marke, Material, Farbe, Stil)
+- 360°-Produktansichten und Zoom-Funktionalität
+- Augmented Reality (AR) für Möbel-Visualisierung
+- Produktvergleichsfunktion
+- Wishlist und Favoriten
+- Produktbewertungen und Reviews
+
+E-Commerce-Funktionen:
+- Intelligenter Warenkorb mit Cross-Selling-Empfehlungen
+- Multi-Step-Checkout mit Gastbestellung
+- Verschiedene Zahlungsmethoden:
+  * Kreditkarte (Visa, Mastercard, Amex)
+  * PayPal und Apple Pay
+  * SEPA-Lastschrift
+  * Klarna (Ratenkauf für Hochpreisprodukte)
+  * Kryptowährungen (Bitcoin, Ethereum)
+- Flexible Versandoptionen:
+  * Standard-Versand (3-5 Werktage)
+  * Express-Versand (1-2 Werktage)
+  * Premium White-Glove-Service für Möbel
+  * Internationale Lieferung
+
+Benutzerverwaltung:
+- Registrierung mit E-Mail-Verifizierung
+- Social Login (Google, Apple, Facebook)
+- Zwei-Faktor-Authentifizierung (2FA)
+- Detaillierte Benutzerprofile mit Präferenzen
+- Bestellhistorie und Tracking
+- Adressbuch mit mehreren Lieferadressen
+- VIP-Kundenstatus mit exklusiven Vorteilen
+
+Content Management:
+- Headless CMS für flexible Content-Verwaltung
+- Multi-Language-Support (Deutsch, Englisch, Französisch)
+- SEO-optimierte Landingpages
+- Blog-System für Lifestyle-Content
+- Newsletter-Integration mit Segmentierung
+
+NICHT-FUNKTIONALE ANFORDERUNGEN
+
+Performance:
+- Ladezeit <2 Sekunden für Produktseiten
+- Core Web Vitals Score >90
+- 99,9% Uptime-Garantie
+- Skalierung für bis zu 10.000 gleichzeitige Benutzer
+
+Sicherheit:
+- SSL/TLS-Verschlüsselung (TLS 1.3)
+- PCI DSS Level 1 Compliance für Zahlungsverarbeitung
+- OWASP Top 10 Security Standards
+- Regelmäßige Penetrationstests
+- DDoS-Schutz und Web Application Firewall
+
+DSGVO UND DATENSCHUTZ (KRITISCH)
+- Vollständige DSGVO-Compliance (EU-DSGVO Art. 25)
+- Privacy by Design und Privacy by Default
+- Explizite Einwilligungsverwaltung für Cookies
+- Recht auf Vergessenwerden (Art. 17 DSGVO)
+- Datenportabilität (Art. 20 DSGVO)
+- Datenschutz-Folgenabschätzung (DSFA)
+- Bestellung eines Datenschutzbeauftragten
+- Dokumentation aller Datenverarbeitungsprozesse
+- Sichere Datenübertragung nur innerhalb der EU
+- Anonymisierung von Analytics-Daten
+
+INTEGRATION UND SCHNITTSTELLEN
+
+ERP-Integration:
+- SAP Business One für Warenwirtschaft
+- Automatische Bestandssynchronisation
+- Preismanagement und Rabattstrukturen
+
+CRM-Integration:
+- Salesforce für Kundenverwaltung
+- Marketing-Automation mit HubSpot
+- Customer Service mit Zendesk
+
+Logistik-Partner:
+- DHL für Standard-Versand
+- UPS für Express-Lieferungen
+- Spezialisierte Kunsttransporte für Hochwertobjekte
+
+Marketing-Tools:
+- Google Analytics 4 (DSGVO-konform)
+- Google Ads und Facebook Ads Integration
+- Mailchimp für E-Mail-Marketing
+- Hotjar für User Experience Analytics
+
+MOBILE STRATEGIE
+- Mobile-First Design-Ansatz
+- Progressive Web App (PWA) Funktionalität
+- Native Apps für iOS und Android (Phase 2)
+- Mobile Payment Integration (Apple Pay, Google Pay)
+- Push-Notifications für Angebote und Updates
+
+RISIKEN UND HERAUSFORDERUNGEN
+
+Technische Risiken:
+- Komplexe Integration verschiedener Systeme
+- Performance-Optimierung bei hochauflösenden Produktbildern
+- Skalierbarkeit während Verkaufsspitzen (Black Friday, Weihnachten)
+- Datenmigration von Legacy-Systemen
+
+Rechtliche Risiken:
+- Änderungen in der DSGVO-Rechtsprechung
+- Neue E-Commerce-Gesetze (Digital Services Act)
+- Internationale Handelsbestimmungen
+- Produkthaftung bei Kunstobjekten
+
+Geschäftliche Risiken:
+- Hohe Kundenerwartungen im Premium-Segment
+- Starke Konkurrenz durch etablierte Luxus-E-Commerce-Anbieter
+- Wirtschaftliche Unsicherheit und Inflation
+- Lieferkettenprobleme bei exklusiven Produkten
+
+BUDGET UND ZEITPLAN
+
+Geschätztes Gesamtbudget: 850.000 - 1.200.000 EUR
+
+Phase 1 (6 Monate): MVP-Entwicklung - 400.000 EUR
+- Grundlegende E-Commerce-Funktionen
+- DSGVO-konforme Basis-Implementation
+- Desktop und Mobile Responsive Design
+
+Phase 2 (4 Monate): Erweiterte Features - 300.000 EUR
+- AR-Funktionalität
+- Erweiterte Personalisierung
+- Mobile Apps
+
+Phase 3 (2 Monate): Optimierung und Launch - 150.000 EUR
+- Performance-Optimierung
+- Sicherheitstests
+- Go-Live und Support
+
+Laufende Kosten (jährlich): 120.000 EUR
+- Cloud-Hosting und CDN
+- Wartung und Updates
+- Support und Monitoring
+
+ERFOLGSMESSUNG (KPIs)
+
+E-Commerce KPIs:
+- Conversion Rate: Ziel >3,5%
+- Average Order Value: Ziel >450 EUR
+- Customer Lifetime Value: Ziel >2.800 EUR
+- Cart Abandonment Rate: <65%
+
+Technische KPIs:
+- Page Load Speed: <2 Sekunden
+- Mobile Performance Score: >90
+- Uptime: >99,9%
+- Security Score: A+ Rating
+
+Business KPIs:
+- Online-Umsatzanteil: 60% bis 2027
+- Neue Kundenakquisition: +40% jährlich
+- Kundenzufriedenheit: >4,5/5 Sterne
+- Return on Investment: >250% nach 3 Jahren
+
+COMPLIANCE UND ZERTIFIZIERUNGEN
+
+Erforderliche Zertifizierungen:
+- ISO 27001 für Informationssicherheit
+- PCI DSS Level 1 für Zahlungsverarbeitung
+- SOC 2 Type II für Cloud-Services
+- Trusted Shops Gütesiegel
+
+Rechtliche Compliance:
+- DSGVO (EU-Datenschutz-Grundverordnung)
+- Digital Services Act (DSA)
+- Verbraucherrechte-Richtlinie
+- Produktsicherheitsgesetz (ProdSG)
+
+NACHHALTIGKEIT UND CSR
+
+Umweltaspekte:
+- CO2-neutrale Cloud-Infrastruktur
+- Optimierung der Lieferketten
+- Digitale Belege statt Papier
+- Green Hosting mit erneuerbaren Energien
+
+Soziale Verantwortung:
+- Barrierefreie Website (WCAG 2.1 AA)
+- Faire Arbeitsbedingungen bei Partnern
+- Unterstützung lokaler Künstler und Designer
+
+TECHNOLOGIE-TRENDS UND ZUKUNFTSSICHERHEIT
+
+Emerging Technologies:
+- Künstliche Intelligenz für Produktempfehlungen
+- Machine Learning für Preisoptimierung
+- Blockchain für Authentizitätszertifikate
+- Voice Commerce Integration (Alexa, Google Assistant)
+
+Zukunftssicherheit:
+- Microservices-Architektur für Flexibilität
+- API-First Approach für Integrationen
+- Cloud-Native Development
+- Continuous Integration/Continuous Deployment (CI/CD)
+
+PROJEKTORGANISATION
+
+Projektteam:
+- Projektleiter: Dr. Sarah Müller (Premium Lifestyle GmbH)
+- Technical Lead: Zu bestimmen (Entwicklungspartner)
+- UX/UI Designer: Spezialisiert auf Luxury E-Commerce
+- Backend-Entwickler: 3-4 Senior-Entwickler
+- Frontend-Entwickler: 2-3 Senior-Entwickler
+- DevOps-Engineer: 1 Senior-Engineer
+- QA-Engineer: 2 Tester
+- Datenschutzbeauftragter: Externe Beratung
+
+Kommunikation:
+- Wöchentliche Status-Meetings
+- Bi-wöchentliche Stakeholder-Updates
+- Monatliche Steering Committee Meetings
+- Agile Entwicklung mit 2-Wochen-Sprints
+
+AUSWAHLKRITERIEN FÜR ENTWICKLUNGSPARTNER
+
+Technische Expertise:
+- Nachgewiesene Erfahrung mit Premium E-Commerce
+- DSGVO-Compliance Expertise
+- AWS-Zertifizierungen
+- Referenzen im Luxury-Segment
+
+Projektmanagement:
+- Agile Methodiken (Scrum/Kanban)
+- Transparente Kommunikation
+- Risikomanagement-Erfahrung
+- Change Management Prozesse
+
+Support und Wartung:
+- 24/7 Support-Verfügbarkeit
+- SLA-Garantien
+- Proaktives Monitoring
+- Regelmäßige Updates und Patches
+
+NÄCHSTE SCHRITTE
+
+1. Ausschreibung an qualifizierte Entwicklungspartner
+2. Detaillierte Anforderungsanalyse mit ausgewählten Partnern
+3. Proof of Concept für kritische Funktionen
+4. Vertragsverhandlungen und Projektstart
+5. Kick-off Meeting und Projektplanung
+
+KONTAKTINFORMATION
+
+Dr. Sarah Müller
+Projektleiterin Digital Transformation
+Premium Lifestyle GmbH
+Maximilianstraße 35
+80539 München
+
+E-Mail: s.mueller@premium-lifestyle.de
+Telefon: +49 89 123456789
+LinkedIn: /in/sarah-mueller-digital
+
+Dieses Dokument ist vertraulich und nur für den internen Gebrauch bestimmt. Alle Angaben unterliegen dem Datenschutz gemäß DSGVO.
+
+---
+Erstellt: 11. August 2025
+Version: 1.0
+Status: Zur Freigabe`;
     
-    console.log('Sample text loaded');
+    console.log('Realistic E-Commerce sample text loaded');
   }
 
   // Export analysis results

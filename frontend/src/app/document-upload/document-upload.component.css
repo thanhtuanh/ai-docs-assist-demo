@@ -146,16 +146,19 @@
 /* Text Input */
 .text-input {
   width: 100%;
-  min-height: 200px;
+  min-height: 400px;
+  max-height: 600px;
   padding: 16px;
   border: 2px solid #d0d0d0;
   border-radius: 8px;
-  font-family: inherit;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  line-height: 1.5;
   resize: vertical;
   transition: all 0.3s ease;
   background: #ffffff;
   color: #333333;
-  line-height: 1.6;
+  overflow-y: auto;
 }
 
 .text-input:focus {

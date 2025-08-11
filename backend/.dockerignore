@@ -1,0 +1,15 @@
+target/
+!target/ai-doc-assist-0.0.1-SNAPSHOT.jar
+.mvn/wrapper/maven-wrapper.jar
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+logs/
+*.log
+.DS_Store
+.idea/
+*.iml
+*.iws
+*.ipr
