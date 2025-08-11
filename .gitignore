@@ -55,3 +55,11 @@ google-credentials.json
 # Angular Build-Verzeichnis
 dist/
 !dist/frontend/browser/
+
+# Angular Cache
+frontend/.angular/
+.angular/
+
+# Q-Chat Status Scripts (lokale Tools)
+q-chat/
+

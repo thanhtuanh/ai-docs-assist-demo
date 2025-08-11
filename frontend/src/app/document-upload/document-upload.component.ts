@@ -16,20 +16,12 @@ export class DocumentUploadComponent {
   isProcessing = false;
   analysisResult: any = null;
   uploadError = '';
-  activeTab: 'upload' | 'text' = 'upload'; // Tab state
 
   constructor(
     private documentService: DocumentService,
     private http: HttpClient,
     private router: Router
   ) {}
-
-  // Tab management
-  setActiveTab(tab: 'upload' | 'text') {
-    this.activeTab = tab;
-    this.clearError();
-    console.log('Switched to tab:', tab);
-  }
 
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -435,8 +427,8 @@ Kleine bis mittlere Unternehmen, die ihre Produkte online verkaufen möchten.`;
 
     const exportData = {
       timestamp: new Date().toISOString(),
-      source: this.activeTab === 'upload' ? 'document' : 'text',
-      filename: this.activeTab === 'upload' ? this.selectedFile?.name : 'text-analysis',
+      source: this.selectedFile ? 'document' : 'text',
+      filename: this.selectedFile ? this.selectedFile.name : 'text-analysis',
       analysis: this.analysisResult
     };
 

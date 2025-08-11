@@ -1,4 +1,4 @@
-/* Global styles - Soft Gray Theme */
+/* Global styles - Standard Gray Theme */
 * {
   box-sizing: border-box;
 }
@@ -7,8 +7,8 @@ body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-  color: #4a5568;
+  background: #f5f5f5;
+  color: #333333;
   line-height: 1.6;
   min-height: 100vh;
 }
@@ -20,22 +20,22 @@ html {
 
 /* Default button styles */
 button {
-  background: linear-gradient(135deg, #718096 0%, #4a5568 100%);
+  background: #666666;
   color: white;
   border: none;
   padding: 12px 20px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 6px;
   margin: 4px;
   font-weight: 500;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(113, 128, 150, 0.3);
+  box-shadow: 0 2px 4px rgba(102, 102, 102, 0.3);
 }
 
 button:hover {
-  background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  background: #555555;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(113, 128, 150, 0.4);
+  box-shadow: 0 4px 8px rgba(102, 102, 102, 0.4);
 }
 
 button:active {
@@ -43,7 +43,7 @@ button:active {
 }
 
 button:disabled {
-  background: #a0aec0;
+  background: #cccccc;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
@@ -54,27 +54,27 @@ button:disabled {
 input[type="file"] {
   margin: 12px 0;
   padding: 8px;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  border: 2px solid #d0d0d0;
+  border-radius: 6px;
   background: #ffffff;
-  color: #4a5568;
+  color: #333333;
   transition: border-color 0.3s ease;
 }
 
 input[type="file"]:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #888888;
+  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.1);
 }
 
 input[type="text"], 
 input[type="email"], 
 textarea {
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
+  border: 2px solid #d0d0d0;
+  border-radius: 6px;
   padding: 12px;
   font-family: inherit;
-  color: #2d3748;
+  color: #333333;
   background: #ffffff;
   transition: all 0.3s ease;
 }
@@ -83,85 +83,82 @@ input[type="text"]:focus,
 input[type="email"]:focus, 
 textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #888888;
+  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.1);
 }
 
 /* Headings */
 h1, h2, h3, h4, h5, h6 {
-  color: #2d3748;
+  color: #333333;
   font-weight: 600;
   margin-bottom: 0.5em;
 }
 
 h1 {
   font-size: 2.25rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #666666;
 }
 
 h2 {
   font-size: 1.875rem;
-  color: #2d3748;
+  color: #333333;
 }
 
 h3 {
   font-size: 1.5rem;
-  color: #4a5568;
+  color: #333333;
 }
 
 /* Links */
 a {
-  color: #667eea;
+  color: #666666;
   text-decoration: none;
   transition: color 0.3s ease;
 }
 
 a:hover {
-  color: #5a67d8;
+  color: #555555;
   text-decoration: underline;
 }
 
 /* Cards and containers */
 .card {
   background: #ffffff;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #d0d0d0;
   margin-bottom: 20px;
   transition: box-shadow 0.3s ease;
 }
 
 .card:hover {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Utility classes */
 .text-muted {
-  color: #718096;
+  color: #666666;
 }
 
 .text-primary {
-  color: #667eea;
+  color: #666666;
 }
 
 .text-success {
-  color: #48bb78;
+  color: #999999;
 }
 
 .text-warning {
-  color: #ed8936;
+  color: #888888;
 }
 
 .text-danger {
-  color: #f56565;
+  color: #cc0000;
 }
 
 .bg-light {
-  background-color: #f7fafc;
+  background-color: #f8f8f8;
 }
 
 .bg-white {
@@ -169,19 +166,19 @@ a:hover {
 }
 
 .rounded {
-  border-radius: 8px;
+  border-radius: 6px;
 }
 
 .shadow-sm {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .shadow {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .shadow-lg {
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* Responsive utilities */

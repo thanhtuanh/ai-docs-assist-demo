@@ -1,1 +1,0 @@
-{"ast":null,"code":"export const environment = {\n  production: true,\n  apiUrl: 'https://bits-ai-docs-assist-backend.onrender.com/api'\n};\nconsole.log('🔧 PRODUCTION Environment loaded:', environment);","map":null,"metadata":{},"sourceType":"module"}
