@@ -1,226 +1,138 @@
-/* Global styles - Standard Gray Theme */
-* {
+/* ===========================================
+   HEADER ANPASSUNGEN - Niedriger machen
+   =========================================== */
+
+header, .header {
+  height: 60px;
+  min-height: 60px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   box-sizing: border-box;
 }
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #f5f5f5;
-  color: #333333;
-  line-height: 1.6;
-  min-height: 100vh;
-}
-
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
-/* Default button styles */
-button {
-  background: #666666;
-  color: white;
-  border: none;
-  padding: 12px 20px;
-  cursor: pointer;
-  border-radius: 6px;
-  margin: 4px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(102, 102, 102, 0.3);
-}
-
-button:hover {
-  background: #555555;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 102, 102, 0.4);
-}
-
-button:active {
-  transform: translateY(0);
-}
-
-button:disabled {
-  background: #cccccc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-  opacity: 0.6;
-}
-
-/* Input styles */
-input[type="file"] {
-  margin: 12px 0;
-  padding: 8px;
-  border: 2px solid #d0d0d0;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #333333;
-  transition: border-color 0.3s ease;
-}
-
-input[type="file"]:focus {
-  outline: none;
-  border-color: #888888;
-  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.1);
-}
-
-input[type="text"], 
-input[type="email"], 
-textarea {
-  border: 2px solid #d0d0d0;
-  border-radius: 6px;
-  padding: 12px;
-  font-family: inherit;
-  color: #333333;
-  background: #ffffff;
-  transition: all 0.3s ease;
-}
-
-input[type="text"]:focus, 
-input[type="email"]:focus, 
-textarea:focus {
-  outline: none;
-  border-color: #888888;
-  box-shadow: 0 0 0 3px rgba(136, 136, 136, 0.1);
-}
-
-/* Headings */
-h1, h2, h3, h4, h5, h6 {
-  color: #333333;
-  font-weight: 600;
-  margin-bottom: 0.5em;
-}
-
-h1 {
-  font-size: 2.25rem;
-  color: #666666;
-}
-
-h2 {
-  font-size: 1.875rem;
-  color: #333333;
-}
-
-h3 {
+/* Logo/Titel kleiner machen */
+.header h1, .header .logo, header h1, header .logo {
   font-size: 1.5rem;
-  color: #333333;
+  margin: 0;
+  line-height: 1;
 }
 
-/* Links */
-a {
-  color: #666666;
+/* Navigation-Links anpassen */
+.header nav a, header nav a {
+  padding: 6px 12px;
   text-decoration: none;
-  transition: color 0.3s ease;
+  border-radius: 4px;
+  transition: background-color 0.2s;
 }
 
-a:hover {
-  color: #555555;
-  text-decoration: underline;
+.header nav a:hover, header nav a:hover {
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
-/* Cards and containers */
-.card {
-  background: #ffffff;
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  border: 1px solid #d0d0d0;
-  margin-bottom: 20px;
-  transition: box-shadow 0.3s ease;
+/* ===========================================
+   SEITENBREITE - 80% für Start und About
+   =========================================== */
+
+.main-content, 
+.start-page, 
+.about-page, 
+.container,
+main {
+  width: 80%;
+  max-width: 80%;
+  margin: 0 auto;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
-.card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
+/* ===========================================
+   RESPONSIVE DESIGN
+   =========================================== */
 
-/* Utility classes */
-.text-muted {
-  color: #666666;
-}
-
-.text-primary {
-  color: #666666;
-}
-
-.text-success {
-  color: #999999;
-}
-
-.text-warning {
-  color: #888888;
-}
-
-.text-danger {
-  color: #cc0000;
-}
-
-.bg-light {
-  background-color: #f8f8f8;
-}
-
-.bg-white {
-  background-color: #ffffff;
-}
-
-.rounded {
-  border-radius: 6px;
-}
-
-.shadow-sm {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.shadow {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.shadow-lg {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Responsive utilities */
+/* Tablets (768px und kleiner) */
 @media (max-width: 768px) {
-  body {
-    background: #ffffff;
+  header, .header {
+    height: 50px;
+    padding: 6px 12px;
   }
   
-  h1 {
-    font-size: 1.875rem;
+  .header h1, .header .logo, header h1, header .logo {
+    font-size: 1.3rem;
   }
   
-  h2 {
-    font-size: 1.5rem;
+  .main-content, 
+  .start-page, 
+  .about-page, 
+  .container,
+  main {
+    width: 90%;
+    padding: 15px;
+  }
+}
+
+/* Mobile Geräte (480px und kleiner) */
+@media (max-width: 480px) {
+  header, .header {
+    height: 45px;
+    padding: 4px 8px;
   }
   
-  .card {
-    padding: 20px;
-    margin-bottom: 16px;
+  .header h1, .header .logo, header h1, header .logo {
+    font-size: 1.2rem;
   }
   
-  button {
-    padding: 10px 16px;
+  .header nav a, header nav a {
+    padding: 4px 8px;
     font-size: 0.9rem;
   }
-}
-
-/* Loading animation */
-@keyframes pulse {
-  0%, 100% {
-    opacity: 1;
+  
+  .main-content, 
+  .start-page, 
+  .about-page, 
+  .container,
+  main {
+    width: 95%;
+    padding: 10px;
   }
-  50% {
-    opacity: 0.5;
+}
+
+/* ===========================================
+   ZUSÄTZLICHE VERBESSERUNGEN
+   =========================================== */
+
+/* Wenn der Header eine Hintergrundfarbe hat */
+header, .header {
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Content-Bereich unter dem Header */
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Falls der Header fixed/sticky ist */
+.header.fixed, header.fixed {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+/* Content-Abstand wenn Header fixed ist */
+.header.fixed + main,
+.header.fixed + .main-content {
+  margin-top: 60px;
+}
+
+@media (max-width: 768px) {
+  .header.fixed + main,
+  .header.fixed + .main-content {
+    margin-top: 50px;
   }
-}
-
-.loading {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Smooth transitions for all elements */
-* {
-  transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }

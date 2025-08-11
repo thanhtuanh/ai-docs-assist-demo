@@ -292,7 +292,7 @@ interface FinancialDocumentAnalysis {
 
 ## 👨‍💻 Über den Entwickler
 
-### **Thanh Tuan Nguyen**
+### **Duc Thanh Nguyen**
 **Java Full-Stack Entwickler mit KI-Spezialisierung**
 
 #### 🎯 Expertise
@@ -319,7 +319,7 @@ interface FinancialDocumentAnalysis {
 ```
 MIT License - Für Demonstrationszwecke und Portfolio
 
-Copyright (c) 2025 Thanh Tuan Nguyen
+Copyright (c) 2025 Duc Thanh Nguyen
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software for educational and demonstration purposes.
