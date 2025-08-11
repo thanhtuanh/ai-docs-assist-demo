@@ -1,138 +1,570 @@
 /* ===========================================
-   HEADER ANPASSUNGEN - Niedriger machen
+   AI DOCUMENT ASSISTANT - OPTIMIERTE CSS
+   Bereinigte und strukturierte Version
    =========================================== */
 
-header, .header {
+/* ===========================================
+   1. GLOBALE STYLES & RESET
+   =========================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+  color: #495057;
+  line-height: 1.6;
+}
+
+/* ===========================================
+   2. HEADER STYLES
+   =========================================== */
+
+header,
+.header {
   height: 60px;
   min-height: 60px;
   padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-sizing: border-box;
-}
-
-/* Logo/Titel kleiner machen */
-.header h1, .header .logo, header h1, header .logo {
-  font-size: 1.5rem;
-  margin: 0;
-  line-height: 1;
-}
-
-/* Navigation-Links anpassen */
-.header nav a, header nav a {
-  padding: 6px 12px;
-  text-decoration: none;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.header nav a:hover, header nav a:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-}
-
-/* ===========================================
-   SEITENBREITE - 80% für Start und About
-   =========================================== */
-
-.main-content, 
-.start-page, 
-.about-page, 
-.container,
-main {
-  width: 80%;
-  max-width: 80%;
-  margin: 0 auto;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-/* ===========================================
-   RESPONSIVE DESIGN
-   =========================================== */
-
-/* Tablets (768px und kleiner) */
-@media (max-width: 768px) {
-  header, .header {
-    height: 50px;
-    padding: 6px 12px;
-  }
-  
-  .header h1, .header .logo, header h1, header .logo {
-    font-size: 1.3rem;
-  }
-  
-  .main-content, 
-  .start-page, 
-  .about-page, 
-  .container,
-  main {
-    width: 90%;
-    padding: 15px;
-  }
-}
-
-/* Mobile Geräte (480px und kleiner) */
-@media (max-width: 480px) {
-  header, .header {
-    height: 45px;
-    padding: 4px 8px;
-  }
-  
-  .header h1, .header .logo, header h1, header .logo {
-    font-size: 1.2rem;
-  }
-  
-  .header nav a, header nav a {
-    padding: 4px 8px;
-    font-size: 0.9rem;
-  }
-  
-  .main-content, 
-  .start-page, 
-  .about-page, 
-  .container,
-  main {
-    width: 95%;
-    padding: 10px;
-  }
-}
-
-/* ===========================================
-   ZUSÄTZLICHE VERBESSERUNGEN
-   =========================================== */
-
-/* Wenn der Header eine Hintergrundfarbe hat */
-header, .header {
-  border-bottom: 1px solid #e0e0e0;
   background-color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Content-Bereich unter dem Header */
-body {
-  margin: 0;
-  padding: 0;
-}
-
-/* Falls der Header fixed/sticky ist */
-.header.fixed, header.fixed {
-  position: fixed;
+  border-bottom: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
   top: 0;
-  left: 0;
-  right: 0;
   z-index: 1000;
 }
 
-/* Content-Abstand wenn Header fixed ist */
-.header.fixed + main,
-.header.fixed + .main-content {
-  margin-top: 60px;
+/* Header Logo/Titel */
+.header h1,
+.header .logo,
+header h1,
+header .logo {
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0;
+  line-height: 1;
+  color: #495057;
 }
 
-@media (max-width: 768px) {
-  .header.fixed + main,
-  .header.fixed + .main-content {
-    margin-top: 50px;
+/* Navigation Links */
+.header nav a,
+header nav a {
+  padding: 6px 12px;
+  text-decoration: none;
+  border-radius: 4px;
+  color: #6c757d;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.header nav a:hover,
+header nav a:hover {
+  background-color: rgba(108, 117, 125, 0.1);
+  color: #495057;
+}
+
+/* ===========================================
+   3. LAYOUT CONTAINER
+   =========================================== */
+
+.main-content,
+.start-page,
+.about-page,
+.home-container,
+.upload-container,
+.container,
+main {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===========================================
+   4. HERO SECTION (HOMEPAGE)
+   =========================================== */
+
+.hero-section {
+  background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+  color: #ffffff;
+  padding: 3rem 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  text-align: center;
+}
+
+.hero-title {
+  font-size: 2.5rem;
+  font-weight: 300;
+  margin-bottom: 1rem;
+  color: #ffffff;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.hero-subtitle {
+  font-size: 1.3rem;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+  color: #f8f9fa;
+}
+
+/* Hero Buttons */
+.hero-badges .badge,
+.demo-badge,
+.portfolio-badge {
+  background-color: rgba(248, 249, 250, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  margin: 0.5rem;
+  display: inline-block;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.hero-badges .badge:hover,
+.demo-badge:hover,
+.portfolio-badge:hover {
+  background-color: rgba(248, 249, 250, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* ===========================================
+   5. CONTENT CARDS & SECTIONS
+   =========================================== */
+
+.overview-card,
+.content-section,
+.document-upload-section,
+.text-input-section,
+.about-card,
+.about-section {
+  background-color: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  transition: box-shadow 0.3s ease;
+}
+
+.overview-card:hover,
+.content-section:hover,
+.about-card:hover,
+.about-section:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+/* Card Headers */
+.overview-card h2,
+.content-section h2,
+.document-upload-section h3,
+.text-input-section h3 {
+  color: #495057;
+  font-size: 1.8rem;
+  font-weight: 500;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0.5rem;
+}
+
+.overview-card h3,
+.content-section h3 {
+  color: #6c757d;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+/* Card Text */
+.overview-card p,
+.content-section p,
+.document-upload-section p {
+  color: #6c757d;
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+}
+
+/* ===========================================
+   6. UPLOAD FUNCTIONALITY
+   =========================================== */
+
+.document-upload-section {
+  text-align: center;
+}
+
+/* File Upload Area */
+.file-upload-area,
+.upload-dropzone,
+.upload-zone {
+  background-color: #f8f9fa;
+  border: 2px dashed #adb5bd;
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  margin: 2rem 0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  text-align: center;
+}
+
+.file-upload-area:hover,
+.upload-dropzone:hover,
+.upload-zone:hover,
+.upload-zone.dragover {
+  background-color: #e9ecef;
+  border-color: #6c757d;
+  transform: scale(1.02);
+}
+
+.upload-icon {
+  font-size: 3rem;
+  color: #adb5bd;
+  margin-bottom: 1rem;
+}
+
+.upload-text {
+  color: #6c757d;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+/* Text Input Area */
+.text-input-area,
+textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 1rem;
+  border: 1px solid #ced4da;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.6;
+  resize: vertical;
+  background-color: #ffffff;
+  color: #495057;
+  font-family: inherit;
+}
+
+.text-input-area:focus,
+textarea:focus {
+  outline: none;
+  border-color: #6c757d;
+  box-shadow: 0 0 0 0.2rem rgba(108, 117, 125, 0.25);
+}
+
+/* File Info Display */
+.file-info {
+  background: #e9ecef;
+  padding: 1rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  color: #495057;
+}
+
+/* ===========================================
+   7. BUTTONS & INTERACTIVE ELEMENTS
+   =========================================== */
+
+.upload-btn,
+.file-input-btn,
+.analyze-btn,
+.process-btn,
+.demo-button,
+.demo-link a,
+.about-page .btn,
+.about-page button {
+  background-color: #6c757d;
+  color: #ffffff;
+  border: none;
+  padding: 0.8rem 2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.analyze-btn,
+.process-btn {
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  margin-top: 1rem;
+}
+
+.upload-btn:hover,
+.file-input-btn:hover,
+.analyze-btn:hover,
+.process-btn:hover,
+.demo-button:hover,
+.demo-link a:hover,
+.about-page .btn:hover,
+.about-page button:hover {
+  background-color: #5a6268;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  color: #ffffff;
+}
+
+.analyze-btn:disabled,
+.process-btn:disabled {
+  background-color: #adb5bd;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ===========================================
+   8. ABOUT PAGE SPECIFIC STYLES
+   =========================================== */
+
+.about-page {
+  background-color: #f8f9fa;
+  color: #2c3e50;
+}
+
+/* About Page Typography */
+.about-page h1 {
+  color: #34495e;
+  font-size: 2.5rem;
+  font-weight: 300;
+  margin-bottom: 2rem;
+  text-align: center;
+  border-bottom: 2px solid #bdc3c7;
+  padding-bottom: 1rem;
+}
+
+.about-page h2 {
+  color: #5d6d7e;
+  font-size: 1.8rem;
+  font-weight: 400;
+  margin-top: 2.5rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #95a5a6;
+  padding-left: 1rem;
+}
+
+.about-page h3 {
+  color: #6c757d;
+  font-size: 1.4rem;
+  font-weight: 500;
+  margin-top: 2rem;
+  margin-bottom: 0.8rem;
+}
+
+.about-page p {
+  color: #495057;
+  font-size: 1.1rem;
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+  text-align: justify;
+}
+
+/* About Page Lists */
+.about-page ul,
+.about-page ol {
+  color: #495057;
+  font-size: 1.1rem;
+  line-height: 1.7;
+  padding-left: 2rem;
+}
+
+.about-page li {
+  margin-bottom: 0.8rem;
+  position: relative;
+}
+
+.about-page ul li::before {
+  content: "▪";
+  color: #95a5a6;
+  font-weight: bold;
+  position: absolute;
+  left: -1.5rem;
+}
+
+/* About Page Links */
+.about-page a {
+  color: #6c757d;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.about-page a:hover {
+  color: #495057;
+  border-bottom-color: #95a5a6;
+}
+
+/* About Page Blockquotes */
+.about-page blockquote {
+  background-color: #f1f3f4;
+  border-left: 4px solid #95a5a6;
+  padding: 1.5rem;
+  margin: 2rem 0;
+  font-style: italic;
+  color: #5d6d7e;
+  border-radius: 0 4px 4px 0;
+}
+
+/* About Page Dividers */
+.about-page hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #bdc3c7, transparent);
+  margin: 3rem 0;
+}
+
+/* ===========================================
+   9. FEATURES GRID & LAYOUTS
+   =========================================== */
+
+.features-grid,
+.feature-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+.feature-card {
+  background-color: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.feature-card h3 {
+  color: #495057;
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+}
+
+.feature-card p {
+  color: #6c757d;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+/* ===========================================
+   10. UTILITY CLASSES
+   =========================================== */
+
+/* Dividers */
+.section-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(to right, transparent, #dee2e6, transparent);
+  margin: 3rem 0;
+}
+
+/* Loading States */
+.loading-spinner {
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid #6c757d;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Progress Bar */
+.progress-bar {
+  background-color: #e9ecef;
+  border-radius: 10px;
+  height: 8px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.progress-fill {
+  background-color: #6c757d;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Alert Messages */
+.alert {
+  padding: 1rem 1.5rem;
+  border-radius: 8px;
+  margin: 1rem 0;
+  border: 1px solid transparent;
+}
+
+.alert-success {
+  background-color: #d1f2eb;
+  border-color: #7dcea0;
+  color: #0e5e47;
+}
+
+.alert-error {
+  background-color: #fadbd8;
+  border-color: #e8a5a0;
+  color: #943126;
+}
+
+.alert-info {
+  background-color: #d6eaf8;
+  border-color: #85c1e9;
+  color: #1b4f72;
+}
+
+/* Results Section */
+.results-section {
+  background: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 12px;
+  padding: 2rem;
+  margin-top: 2rem;
+  display: none;
+}
+
+.results-section.show {
+  display: block;
+  animation: slideUp 0.5s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
+
+/* Footer */
+.homepage-footer {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+  border-top: 1px solid #dee2e6;
+  margin-top: 3rem;
+}
+
+/* ===========================================
+   11. RESP

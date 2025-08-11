@@ -1,14 +1,22 @@
 package com.bits.aidocassist.test;
 
-import com.bits.aidocassist.model.Document;
-import com.bits.aidocassist.service.DocumentService;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
+
+import org.junit.jupiter.api.Test;
+
+import com.bits.aidocassist.model.Document;
+import com.bits.aidocassist.service.DocumentService;
+
 @SpringBootTest
-public class DocumentServiceTest {
+@TestPropertySource(properties = {
+    "openai.api.key=",
+    "logging.level.com.bits.aidocassist=ERROR"
+})
+public class SimpleDocumentServiceTest {
 
     @Autowired
     private DocumentService documentService;
