@@ -16,17 +16,31 @@ RUN ./mvnw -B clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# kleineres Image, keine optionalen Tools
+# (curl sparen wir uns für minimalen RAM-Footprint)
+
 # non-root user
 RUN addgroup -g 1001 -S appgroup \
  && adduser -u 1001 -S appuser -G appgroup
 
-# Jar aus dem Build übernehmen (Dateiname egal)
+# Jar aus dem Build übernehmen (Name egal)
 COPY --from=build /app/target/*.jar app.jar
 
-# optional: curl für Healthchecks
-RUN apk add --no-cache curl \
- && chown -R appuser:appgroup /app
-USER appuser
+# konservative Defaults für 512 MiB Instanz
+# (kann in Render via ENV überschrieben werden)
+ENV JAVA_TOOL_OPTIONS="\
+ -Xms128m \
+ -Xmx256m \
+ -XX:+UseSerialGC \
+ -XX:MaxMetaspaceSize=128m \
+ -Dserver.tomcat.max-threads=20 \
+ -Dspring.datasource.hikari.maximum-pool-size=5 \
+ -Dspring.main.lazy-initialization=true \
+ -Dfile.encoding=UTF-8 \
+ -XX:+ExitOnOutOfMemoryError"
 
+USER appuser
 EXPOSE 8080
-CMD ["java","-XX:+UseZGC","-XX:+UnlockExperimentalVMOptions","-XX:+UseTransparentHugePages","-Xmx1024m","-Xms512m","-jar","app.jar"]
+
+# Start
+CMD ["java","-jar","app.jar"]
