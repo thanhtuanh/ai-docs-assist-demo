@@ -1,13 +1,20 @@
 // src/app/document.service.ts
-import { HttpClient, HttpEventType } from '@angular/common/http';
+import { HttpClient, HttpEventType, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable, throwError } from 'rxjs';
 import { catchError, map, retry, filter } from 'rxjs/operators';
 import { environment } from '../environments/environment';
 
-@Injectable({
-  providedIn: 'root'
-})
+type AnalyzeOptions = {
+  generateSummary?: boolean;
+  extractKeywords?: boolean;
+  suggestComponents?: boolean;
+  performSentimentAnalysis?: boolean;
+  detectLanguage?: boolean;
+  calculateMetrics?: boolean;
+};
+
+@Injectable({ providedIn: 'root' })
 export class DocumentService {
   private baseUrl = environment.apiUrl; // z.B. http://localhost:8080/api
 
@@ -18,80 +25,67 @@ export class DocumentService {
       reportProgress: true,
       observe: 'events'
     }).pipe(
-      map(event => {
-        if (event.type === HttpEventType.Response) {
-          return event.body;
-        }
-        return null;
-      }),
-      filter(response => response !== null),
+      map(event => (event.type === HttpEventType.Response ? event.body : null)),
+      filter((response): response is any => response !== null),
       retry(2),
       catchError(this.handleError)
     );
   }
 
-  analyzeText(text: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/documents/analyze-text`, { text }).pipe(
-      catchError(this.handleError)
-    );
+  // 🔧 Rückwärtskompatibel: akzeptiert string ODER Payload-Objekt
+  analyzeText(input: string | { text: string; title?: string; options?: AnalyzeOptions; saveDocument?: boolean }): Observable<any> {
+    const payload = typeof input === 'string' ? { text: input, saveDocument: true } : input;
+    return this.http.post(`${this.baseUrl}/documents/analyze-text`, payload)
+      .pipe(catchError(this.handleError));
   }
 
-  analyzeDocument(file: File, options: any): Observable<any> {
+  analyzeDocument(file: File, options?: AnalyzeOptions): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('analysisOptions', JSON.stringify(options));
+    if (options) formData.append('analysisOptions', JSON.stringify(options));
+    return this.createDocument(formData);
+  }
 
-    return this.http.post(`${this.baseUrl}/documents`, formData, {
+  analyzeRealtime(text: string, language?: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/documents/analyze-realtime`, { text, language })
+      .pipe(catchError(this.handleError));
+  }
+
+  uploadBatch(files: File[], options?: AnalyzeOptions): Observable<any> {
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    if (options) form.append('analysisOptions', JSON.stringify(options));
+    return this.http.post(`${this.baseUrl}/documents/batch`, form, {
       reportProgress: true,
       observe: 'events'
     }).pipe(
-      map(event => {
-        if (event.type === HttpEventType.Response) {
-          return event.body;
-        }
-        return null;
-      }),
-      filter(response => response !== null),
+      map(event => (event.type === HttpEventType.Response ? event.body : null)),
+      filter((response): response is any => response !== null),
       retry(2),
       catchError(this.handleError)
     );
   }
 
-  getDocument(id: string): Observable<any> {
-    return this.http.get(`${this.baseUrl}/documents/${id}`).pipe(
-      catchError(this.handleError)
-    );
-  }
-
-  deleteDocument(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/documents/${id}`).pipe(
-      catchError(this.handleError)
-    );
-  }
-
-  getDocumentHistory(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/documents/history`).pipe(
-      catchError(this.handleError)
-    );
+  getDocument(id: number | string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/documents/${id}`)
+      .pipe(catchError(this.handleError));
   }
 
   private handleError(error: any) {
     console.error('API Error:', error);
-    let errorMessage = 'Ein unbekannter Fehler ist aufgetreten';
-
-    if (error.error instanceof ErrorEvent) {
-      errorMessage = `Client-Fehler: ${error.error.message}`;
-    } else if (error.status) {
+    let msg = 'Ein unbekannter Fehler ist aufgetreten';
+    if (error?.error instanceof ErrorEvent) msg = `Client-Fehler: ${error.error.message}`;
+    else if (typeof error?.status === 'number') {
       switch (error.status) {
-        case 400: errorMessage = 'Ungültige Anfrage. Bitte prüfen Sie die Eingaben.'; break;
-        case 401: errorMessage = 'Nicht autorisiert. Bitte anmelden.'; break;
-        case 413: errorMessage = 'Datei zu groß.'; break;
-        case 429: errorMessage = 'Zu viele Anfragen. Bitte später erneut versuchen.'; break;
-        case 500: errorMessage = 'Serverfehler. Bitte Support kontaktieren.'; break;
-        default:  errorMessage = `Server-Fehler: ${error.status} - ${error.message}`; break;
+        case 0: msg = 'Server nicht erreichbar. Läuft das Backend?'; break;
+        case 400: msg = 'Ungültige Anfrage. Bitte Eingaben prüfen.'; break;
+        case 404: msg = 'Endpoint nicht gefunden. Prüfe die URL im Service.'; break;
+        case 413: msg = 'Datei zu groß.'; break;
+        case 429: msg = 'Zu viele Anfragen. Später erneut versuchen.'; break;
+        case 500: msg = 'Serverfehler. Bitte Support kontaktieren.'; break;
+        default: msg = `Server-Fehler: ${error.status} - ${error.message || 'Unbekannt'}`;
       }
     }
-
-    return throwError(() => new Error(errorMessage));
+    return throwError(() => new Error(msg));
   }
 }
