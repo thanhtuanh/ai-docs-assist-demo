@@ -68,10 +68,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "browserTarget": "ai-doc-assist-frontend:build:production"
+              "buildTarget": "ai-doc-assist-frontend:build:production"
             },
             "development": {
-              "browserTarget": "ai-doc-assist-frontend:build:development"
+              "buildTarget": "ai-doc-assist-frontend:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -79,7 +79,7 @@
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "ai-doc-assist-frontend:build"
+            "buildTarget": "ai-doc-assist-frontend:build"
           }
         },
         "test": {

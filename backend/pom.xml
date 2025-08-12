@@ -44,7 +44,7 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        
+
         <!-- Actuator für Health Checks -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -64,7 +64,7 @@
             <artifactId>pdfbox</artifactId>
             <version>2.0.29</version>
         </dependency>
-        
+
         <!-- Für Word-Dokumente -->
         <dependency>
             <groupId>org.apache.poi</groupId>
@@ -94,7 +94,7 @@
         </dependency>
 
         <!-- ===== TEST DEPENDENCIES ===== -->
-        
+
         <!-- Spring Boot Test (Standard ohne Ausschlüsse) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -102,12 +102,13 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- H2 für Tests -->
+        <!-- H2 for runtime (NOT test scope) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <version>2.2.224</version>
         </dependency>
+
     </dependencies>
 
     <build>

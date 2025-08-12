@@ -1,76 +1,115 @@
+// src/app/services/api.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
-import { catchError, retry, timeout } from 'rxjs/operators';
-import { environment } from '../../environments/environment';
+import { catchError, retry } from 'rxjs/operators';
+import { EnhancedAnalysisResult } from '../models/industry.interfaces';
+
+export interface ApiFeedbackData {
+  rating: number;
+  comment: string;
+  analysisId: string;
+  timestamp: Date;
+  industryId?: string;
+  textLength?: number;
+  analysisType?: 'document' | 'text';
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
-  private apiUrl: string;
+  private baseUrl = 'http://localhost:8080/api';
+  private httpOptions = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json'
+    })
+  };
 
-  constructor(private http: HttpClient) {
-    // Prüfe ob wir im Container laufen
-    this.apiUrl = this.getApiUrl();
-    console.log('Using API URL:', this.apiUrl);
-  }
+  constructor(private http: HttpClient) {}
 
-  private getApiUrl(): string {
-    // In Production mit Nginx Proxy
-    if (environment.production) {
-      return '/api';
+  // Document Analysis
+  analyzeDocument(file: File, industry?: string): Observable<EnhancedAnalysisResult> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (industry && industry !== 'auto') {
+      formData.append('industry', industry);
     }
     
-    // Lokale Entwicklung
-    return environment.apiUrl;
-  }
-
-  analyzeText(text: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/documents/analyze-text`, { text })
+    return this.http.post<EnhancedAnalysisResult>(`${this.baseUrl}/analyze/document`, formData)
       .pipe(
-        timeout(30000), // 30 Sekunden Timeout
-        retry(2),
+        retry(1),
         catchError(this.handleError)
       );
   }
 
-  healthCheck(): Observable<any> {
-    return this.http.get(`${this.apiUrl}/health`)
-      .pipe(
-        timeout(5000),
-        catchError(this.handleError)
-      );
-  }
-
-  private handleError(error: HttpErrorResponse) {
-    let errorMessage = 'Ein unbekannter Fehler ist aufgetreten';
+  // Text Analysis
+  analyzeText(text: string, industry?: string): Observable<EnhancedAnalysisResult> {
+    const payload = { 
+      text, 
+      industry: industry !== 'auto' ? industry : undefined,
+      timestamp: new Date().toISOString()
+    };
     
-    console.error('API Error Details:', error);
+    return this.http.post<EnhancedAnalysisResult>(`${this.baseUrl}/analyze/text`, payload, this.httpOptions)
+      .pipe(
+        retry(1),
+        catchError(this.handleError)
+      );
+  }
+
+  // Feedback Submission
+  submitFeedback(feedbackData: ApiFeedbackData): Observable<any> {
+    return this.http.post(`${this.baseUrl}/feedback`, feedbackData, this.httpOptions)
+      .pipe(
+        retry(1),
+        catchError(this.handleError)
+      );
+  }
+
+  // Export Analysis Results
+  exportAnalysis(analysisId: string, format: 'pdf' | 'excel' | 'json'): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/export/${analysisId}/${format}`, {
+      responseType: 'blob'
+    }).pipe(
+      retry(1),
+      catchError(this.handleError)
+    );
+  }
+
+  private handleError(error: any) {
+    let errorMessage = 'Ein unbekannter Fehler ist aufgetreten';
     
     if (error.error instanceof ErrorEvent) {
       // Client-side error
-      errorMessage = `Netzwerkfehler: ${error.error.message}`;
+      errorMessage = `Client Error: ${error.error.message}`;
     } else {
       // Server-side error
       switch (error.status) {
-        case 0:
-          errorMessage = 'Backend-Server nicht erreichbar. Prüfen Sie, ob der Server läuft.';
+        case 400:
+          errorMessage = 'Ungültige Anfrage. Bitte überprüfen Sie Ihre Eingaben.';
+          break;
+        case 401:
+          errorMessage = 'Nicht autorisiert. Bitte melden Sie sich an.';
+          break;
+        case 403:
+          errorMessage = 'Zugriff verweigert.';
           break;
         case 404:
-          errorMessage = 'API-Endpunkt nicht gefunden. Prüfen Sie die URL.';
+          errorMessage = 'Service nicht gefunden.';
+          break;
+        case 429:
+          errorMessage = 'Zu viele Anfragen. Bitte versuchen Sie es später erneut.';
           break;
         case 500:
-          errorMessage = 'Interner Serverfehler. Prüfen Sie die Server-Logs.';
-          break;
-        case 503:
-          errorMessage = 'Service temporär nicht verfügbar.';
+          errorMessage = 'Server-Fehler. Bitte versuchen Sie es später erneut.';
           break;
         default:
-          errorMessage = `HTTP ${error.status}: ${error.statusText}`;
+          errorMessage = `Server Error: ${error.status} - ${error.message}`;
       }
     }
     
-    return throwError(() => new Error(errorMessage));
+    console.error('API Error:', error);
+    return throwError(errorMessage);
   }
 }

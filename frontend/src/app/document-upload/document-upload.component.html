@@ -1,188 +1,539 @@
-<div class="upload-container">
-  <h1 class="title">🤖 AI Document Assistant</h1>
+<div class="main-content">
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <h1 class="hero-title">🤖 AI Document Assistant</h1>
+    <p class="hero-subtitle">Branchenspezifische Dokumentenanalyse mit KI-Integration</p>
+  </div>
 
-  <!-- Unified Content -->
-  <div class="unified-content">
-    <div class="upload-card">
-      <h2>📄 Dokument & Text Analyse</h2>
-      <p class="description">Laden Sie ein Dokument hoch oder fügen Sie Text direkt ein für eine automatische Analyse.</p>
-      
-      <!-- File Upload Section -->
-      <div class="input-section">
-        <h3>📄 Dokument hochladen</h3>
-        <input 
-          type="file" 
-          class="file-input" 
-          (change)="onFileSelected($event)"
-          accept=".pdf,.txt,.doc,.docx,.csv,.json,.md"
-          #fileInput>
-        
-        <div class="file-info" *ngIf="selectedFile">
-          <div class="file-details">
-            <span class="file-name">📎 {{ selectedFile.name }}</span>
-            <span class="file-size" [class.error]="selectedFile.size === 0">
-              {{ formatFileSize(selectedFile.size) }}
-            </span>
-            <span class="file-type">{{ getFileTypeDisplay(selectedFile.type) }}</span>
-          </div>
-          <div class="file-status" *ngIf="selectedFile.size === 0" class="warning">
-            ⚠️ Warnung: Datei scheint leer zu sein
-          </div>
-          <div class="file-actions">
-            <button class="clear-btn" (click)="clearFile(fileInput)">
-              🗑️ Datei entfernen
-            </button>
+  <div class="card card-large">
+    <!-- Industry Selection Section -->
+    <div class="section-title">🎯 Intelligente Branchenerkennung</div>
+    <div class="section-description">
+      Unser System erkennt automatisch Ihre Branche und passt die Analyse entsprechend an. 
+      Sie können auch manuell eine Branche auswählen für optimierte Ergebnisse.
+    </div>
+
+    <div class="industry-selection">
+      <div class="industry-grid">
+        <div class="industry-card" 
+             [class.selected]="selectedIndustry === 'auto'" 
+             (click)="setIndustry('auto')">
+          <div class="industry-icon">🤖</div>
+          <h4>Automatische Erkennung</h4>
+          <p>KI erkennt die Branche basierend auf Ihrem Text</p>
+          <div class="industry-badge auto">Empfohlen</div>
+        </div>
+
+        <div class="industry-card" 
+             [class.selected]="selectedIndustry === 'ecommerce'" 
+             (click)="setIndustry('ecommerce')">
+          <div class="industry-icon">🛒</div>
+          <h4>E-Commerce & Retail</h4>
+          <p>Online-Shops, Mobile Commerce, Payment-Systeme</p>
+          <div class="industry-features">
+            <span class="feature-tag">PWA</span>
+            <span class="feature-tag">Payment</span>
+            <span class="feature-tag">Mobile</span>
           </div>
         </div>
 
-        <div class="upload-buttons">
-          <button 
-            class="analyze-btn" 
-            (click)="uploadDocument()" 
-            [disabled]="!selectedFile || isProcessing || selectedFile.size === 0">
-            {{ isProcessing ? '⏳ Analysiere...' : '🚀 Dokument analysieren' }}
+        <div class="industry-card" 
+             [class.selected]="selectedIndustry === 'healthcare'" 
+             (click)="setIndustry('healthcare')">
+          <div class="industry-icon">🏥</div>
+          <h4>Healthcare & Medizin</h4>
+          <p>Krankenhäuser, Praxen, Medizintechnik</p>
+          <div class="industry-features">
+            <span class="feature-tag">HIPAA</span>
+            <span class="feature-tag">FHIR</span>
+            <span class="feature-tag">Security</span>
+          </div>
+        </div>
+
+        <div class="industry-card" 
+             [class.selected]="selectedIndustry === 'fintech'" 
+             (click)="setIndustry('fintech')">
+          <div class="industry-icon">💰</div>
+          <h4>Fintech & Banking</h4>
+          <p>Payment, Banking, Blockchain, Trading</p>
+          <div class="industry-features">
+            <span class="feature-tag">PCI-DSS</span>
+            <span class="feature-tag">Fraud</span>
+            <span class="feature-tag">Real-time</span>
+          </div>
+        </div>
+
+        <div class="industry-card" 
+             [class.selected]="selectedIndustry === 'manufacturing'" 
+             (click)="setIndustry('manufacturing')">
+          <div class="industry-icon">🏭</div>
+          <h4>Manufacturing & Industry 4.0</h4>
+          <p>Produktion, IoT, Smart Factory, Automation</p>
+          <div class="industry-features">
+            <span class="feature-tag">IoT</span>
+            <span class="feature-tag">Predictive</span>
+            <span class="feature-tag">Automation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Selected Industry Info -->
+    <div *ngIf="selectedIndustry && selectedIndustry !== 'auto'" class="selected-industry-info">
+      <h4>{{ getIndustryName(selectedIndustry) }} - Spezifische Analyse</h4>
+      <div class="industry-details">
+        <div class="detail-section">
+          <strong>🎯 Fokus-Bereiche:</strong>
+          <div class="focus-areas">
+            <span *ngFor="let area of getIndustryFocusAreas(selectedIndustry)" class="focus-tag">{{ area }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <strong>📋 Compliance & Regulierung:</strong>
+          <div class="compliance-items">
+            <span *ngFor="let reg of getIndustryRegulations(selectedIndustry)" class="compliance-tag">{{ reg }}</span>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <strong>📊 Wichtige KPIs:</strong>
+          <div class="kpi-items">
+            <span *ngFor="let kpi of getIndustryKPIs(selectedIndustry)" class="kpi-tag">{{ kpi }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Upload Section -->
+    <div class="upload-section">
+      <div class="section-title">📤 Dokument hochladen</div>
+      <div class="file-upload-container">
+        <div class="file-upload-area" 
+             [class.dragover]="isDragOver"
+             (click)="onFileAreaClick()"
+             (dragover)="onDragOver($event)"
+             (dragleave)="onDragLeave($event)"
+             (drop)="onFileDrop($event)"
+             [style.display]="selectedFile ? 'none' : 'flex'">
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">Datei auswählen</div>
+          <div class="upload-hint">PDF, DOC, DOCX, TXT, CSV, JSON - Max. 10MB</div>
+        </div>
+        
+        <input type="file" 
+               #fileInput
+               class="file-input"
+               accept=".pdf,.doc,.docx,.txt,.csv,.json"
+               (change)="onFileSelected($event)">
+        
+        <div *ngIf="selectedFile" class="selected-file">
+          <div class="file-info">
+            <span class="file-icon">📄</span>
+            <span class="file-name">{{ selectedFile.name }}</span>
+            <span class="file-size">({{ getFileSize(selectedFile.size) }})</span>
+          </div>
+          <button class="remove-file" 
+                  (click)="removeFile()"
+                  type="button">✕</button>
+        </div>
+      </div>
+      
+      <button class="btn btn-success btn-full btn-large" 
+              [disabled]="!selectedFile || isAnalyzing"
+              (click)="analyzeDocument()"
+              type="button">
+        <span *ngIf="!isAnalyzing">📊 Dokument analysieren</span>
+        <span *ngIf="isAnalyzing">
+          <span class="spinner"></span>
+          Analysiere...
+        </span>
+      </button>
+    </div>
+
+    <div class="separator">
+      <span>oder</span>
+    </div>
+
+    <!-- Text Input Section -->
+    <div class="text-input-section">
+      <div class="section-title">✏️ Text direkt eingeben</div>
+      
+      <!-- Demo Text Selection -->
+      <div class="demo-texts-section">
+        <h4>📄 Branchenspezifische Demo-Texte</h4>
+        <p class="demo-description">Laden Sie realistische Projekt-Ausschreibungen mit 25.000+ Zeichen für umfassende Demo-Analysen</p>
+        <div class="demo-buttons">
+          <button class="demo-text-btn" (click)="loadDemoText('ecommerce')">
+            🛒 E-Commerce Modernisierung<br>
+            <small>FashionForward - 50k Produkte, 25M€ Umsatz</small>
+          </button>
+          <button class="demo-text-btn" (click)="loadDemoText('healthcare')">
+            🏥 Krankenhaus-Management<br>
+            <small>Universitätsklinikum - 1.200 Betten, HIPAA</small>
+          </button>
+          <button class="demo-text-btn" (click)="loadDemoText('fintech')">
+            💰 Payment-Platform<br>
+            <small>SecurePay - PCI-DSS Level 1, Real-time</small>
+          </button>
+          <button class="demo-text-btn" (click)="loadDemoText('manufacturing')">
+            🏭 Smart Factory IoT<br>
+            <small>Industry 4.0 - 15k Sensoren, Predictive AI</small>
           </button>
         </div>
       </div>
-
-      <!-- Divider -->
-      <div class="divider">
-        <span>oder</span>
-      </div>
-
-      <!-- Text Input Section -->
-      <div class="input-section">
-        <h3>✍️ Text direkt eingeben</h3>
-        <textarea 
-          class="text-input" 
-          [(ngModel)]="inputText" 
-          placeholder="Fügen Sie hier Ihren Text ein, den Sie analysieren möchten..."
-          maxlength="15000">
-        </textarea>
+      
+      <textarea class="text-input-area" 
+                [(ngModel)]="textInput"
+                [class.text-too-long]="isTextTooLong()"
+                placeholder="Fügen Sie hier Ihren Text ein, den Sie analysieren möchten, oder nutzen Sie einen der Demo-Texte oben..."
+                rows="12">
+      </textarea>
+      
+      <div class="text-controls">
+        <div class="text-counter">
+          {{ formatNumber(textInput.length) }} / {{ formatNumber(getTextLimit()) }} Zeichen
+          <span *ngIf="textInput.length > getTextLimit() * 0.9" class="counter-warning">
+            ({{ ((textInput.length / getTextLimit()) * 100) | number:'1.0-0' }}% verwendet)
+          </span>
+        </div>
         
-        <div class="text-info">
-          <div class="char-counter" [class.warning]="inputText.length > 14000">
-            {{ inputText.length }}/15000 Zeichen
-          </div>
-          <div class="text-actions">
-            <button class="clear-btn" (click)="clearText()" *ngIf="inputText.length > 0">
-              🗑️ Text löschen
-            </button>
-            <button class="sample-btn" (click)="loadSampleText()">
-              📝 Beispieltext laden
-            </button>
-          </div>
+        <div class="text-limit-info">
+          <strong>Free Plan:</strong> {{ formatNumber(textLimits.free) }} Zeichen (~40-50 Seiten)
         </div>
+      </div>
+      
+      <button class="btn btn-primary btn-full btn-large" 
+              [disabled]="!textInput.trim() || isAnalyzing || isTextTooLong()"
+              (click)="analyzeText()"
+              type="button">
+        <span *ngIf="!isAnalyzing && !isTextTooLong()">🔍 Text analysieren</span>
+        <span *ngIf="!isAnalyzing && isTextTooLong()">❌ Text zu lang ({{ formatNumber(textInput.length) }} Zeichen)</span>
+        <span *ngIf="isAnalyzing">
+          <span class="spinner"></span>
+          Analysiere...
+        </span>
+      </button>
+    </div>
 
-        <button 
-          class="analyze-btn" 
-          (click)="analyzeText()" 
-          [disabled]="!inputText.trim() || isProcessing">
-          {{ isProcessing ? '⏳ Analysiere...' : '🔍 Text analysieren' }}
-        </button>
+    <!-- Error Message -->
+    <div *ngIf="errorMessage" class="error-message">
+      <span class="error-icon">⚠️</span>
+      {{ errorMessage }}
+    </div>
+  </div>
+
+  <!-- Enhanced Analysis Results -->
+  <div *ngIf="analysisResult" class="analysis-results enhanced">
+    <div class="card card-large">
+      <div class="section-title">🎯 Branchenspezifische Analyseergebnisse</div>
+      
+      <!-- Industry Detection Result -->
+      <div class="result-section industry-detection">
+        <h4>🔍 Erkannte Branche</h4>
+        <div class="detected-industry">
+          <span class="industry-name">{{ analysisResult.detectedIndustry.name }}</span>
+          <span class="confidence-badge" [ngClass]="getConfidenceClass(analysisResult.confidence)">
+            {{ analysisResult.confidence }}% Sicherheit
+          </span>
+        </div>
+        <p class="industry-description">{{ analysisResult.detectedIndustry.description }}</p>
       </div>
 
-      <!-- Combined Info Section -->
-      <div class="info-section">
-        <div class="supported-formats">
-          <h4>📋 Unterstützte Formate:</h4>
-          <div class="format-tags">
-            <span class="format-tag">PDF</span>
-            <span class="format-tag">TXT</span>
-            <span class="format-tag">DOC</span>
-            <span class="format-tag">DOCX</span>
-            <span class="format-tag">CSV</span>
-            <span class="format-tag">JSON</span>
-            <span class="format-tag">MD</span>
+      <!-- Keywords with Industry Context -->
+      <div class="result-section keywords-enhanced">
+        <h4>🔑 Branchenspezifische Schlüsselwörter</h4>
+        <div class="keywords-categorized">
+          <div class="keyword-category">
+            <strong>💻 Technologien ({{ analysisResult.technologyKeywords.length }}):</strong>
+            <div class="keywords">
+              <span *ngFor="let keyword of analysisResult.technologyKeywords" class="keyword-tag tech">{{ keyword }}</span>
+            </div>
           </div>
-          <p class="format-note">Maximale Dateigröße: 10 MB</p>
+          <div class="keyword-category">
+            <strong>🏢 Business-Begriffe ({{ analysisResult.businessKeywords.length }}):</strong>
+            <div class="keywords">
+              <span *ngFor="let keyword of analysisResult.businessKeywords" class="keyword-tag business">{{ keyword }}</span>
+            </div>
+          </div>
+          <div class="keyword-category">
+            <strong>📋 Compliance ({{ analysisResult.complianceKeywords.length }}):</strong>
+            <div class="keywords">
+              <span *ngFor="let keyword of analysisResult.complianceKeywords" class="keyword-tag compliance">{{ keyword }}</span>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div class="analysis-features">
-          <h4>🔍 Analyse Features:</h4>
+      <!-- Enhanced Summary -->
+      <div class="result-section">
+        <h4>📄 Intelligente Zusammenfassung</h4>
+        <p class="enhanced-summary">{{ analysisResult.summary }}</p>
+      </div>
+
+      <!-- Industry-Specific Recommendations -->
+      <div class="result-section recommendations-enhanced">
+        <h4>💡 Priorisierte Empfehlungen</h4>
+        <div class="recommendations-categorized">
+          <div class="recommendation-category high-priority">
+            <h5>🔴 Hohe Priorität ({{ analysisResult.highPriorityRecommendations.length }})</h5>
+            <ul>
+              <li *ngFor="let rec of analysisResult.highPriorityRecommendations">{{ rec }}</li>
+            </ul>
+          </div>
+          <div class="recommendation-category medium-priority">
+            <h5>🟡 Mittlere Priorität ({{ analysisResult.mediumPriorityRecommendations.length }})</h5>
+            <ul>
+              <li *ngFor="let rec of analysisResult.mediumPriorityRecommendations">{{ rec }}</li>
+            </ul>
+          </div>
+          <div class="recommendation-category low-priority">
+            <h5>🟢 Niedrige Priorität ({{ analysisResult.lowPriorityRecommendations.length }})</h5>
+            <ul>
+              <li *ngFor="let rec of analysisResult.lowPriorityRecommendations">{{ rec }}</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Budget & Timeline Estimation -->
+      <div class="result-section budget-timeline">
+        <h4>💰 Budget & Timeline Schätzung</h4>
+        <div class="estimation-grid">
+          <div class="estimation-item budget">
+            <h5>💰 Budget-Schätzung</h5>
+            <div class="budget-range">
+              <span class="budget-amount">{{ formatCurrency(analysisResult.estimatedBudget.min) }}</span>
+              <span class="budget-separator"> - </span>
+              <span class="budget-amount">{{ formatCurrency(analysisResult.estimatedBudget.max) }}</span>
+            </div>
+            <div class="budget-confidence">
+              Konfidenz: <strong>{{ analysisResult.estimatedBudget.confidence }}</strong>
+            </div>
+            <div class="budget-factors">
+              <strong>Kostenfaktoren:</strong>
+              <ul>
+                <li *ngFor="let factor of analysisResult.estimatedBudget.factors">{{ factor }}</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="estimation-item timeline">
+            <h5>⏱️ Zeitplan-Schätzung</h5>
+            <div class="timeline-duration">
+              <span class="timeline-months">{{ analysisResult.timeline.estimated }}</span>
+              <span class="timeline-unit">Monate</span>
+            </div>
+            <div class="timeline-phases">
+              <strong>Projekt-Phasen:</strong>
+              <div class="phases-list">
+                <div *ngFor="let phase of analysisResult.timeline.phases" class="phase-item">
+                  <span class="phase-name">{{ phase.name }}</span>
+                  <span class="phase-duration">{{ phase.duration }}M</span>
+                </div>
+              </div>
+            </div>
+            <div class="critical-path">
+              <strong>Kritischer Pfad:</strong>
+              <div class="critical-items">
+                <span *ngFor="let item of analysisResult.timeline.criticalPath" class="critical-tag">{{ item }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compliance Analysis -->
+      <div class="result-section compliance-analysis">
+        <h4>📋 Compliance-Analyse</h4>
+        <div class="compliance-grid">
+          <div *ngFor="let compliance of analysisResult.complianceResults" 
+               class="compliance-item" 
+               [ngClass]="compliance.relevance">
+            <div class="compliance-header">
+              <strong>{{ compliance.regulation }}</strong>
+              <span class="relevance-badge" [ngClass]="compliance.relevance">{{ compliance.relevance }}</span>
+            </div>
+            <div class="compliance-keywords" *ngIf="compliance.foundKeywords.length > 0">
+              <small>Gefundene Keywords:</small>
+              <span *ngFor="let keyword of compliance.foundKeywords" class="found-keyword">{{ keyword }}</span>
+            </div>
+            <div class="compliance-requirements">
+              <strong>Anforderungen:</strong>
+              <ul>
+                <li *ngFor="let req of compliance.requirements">{{ req }}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Assessment -->
+      <div class="result-section risk-assessment">
+        <h4>⚠️ Risiko-Bewertung</h4>
+        <div class="risk-grid">
+          <div class="risk-item">
+            <div class="risk-label">🎯 Gesamt-Risiko</div>
+            <div class="risk-meter">
+              <div class="risk-bar overall" [style.width.%]="analysisResult.riskAssessment.overall * 10"></div>
+            </div>
+            <div class="risk-value">{{ analysisResult.riskAssessment.overall }}/10</div>
+            <div class="risk-description">{{ getRiskLabel(analysisResult.riskAssessment.overall) }}</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-label">🛡️ Sicherheit</div>
+            <div class="risk-meter">
+              <div class="risk-bar security" [style.width.%]="analysisResult.riskAssessment.security * 10"></div>
+            </div>
+            <div class="risk-value">{{ analysisResult.riskAssessment.security }}/10</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-label">📋 Compliance</div>
+            <div class="risk-meter">
+              <div class="risk-bar compliance" [style.width.%]="analysisResult.riskAssessment.compliance * 10"></div>
+            </div>
+            <div class="risk-value">{{ analysisResult.riskAssessment.compliance }}/10</div>
+          </div>
+          <div class="risk-item">
+            <div class="risk-label">⚙️ Technisch</div>
+            <div class="risk-meter">
+              <div class="risk-bar technical" [style.width.%]="analysisResult.riskAssessment.technical * 10"></div>
+            </div>
+            <div class="risk-value">{{ analysisResult.riskAssessment.technical }}/10</div>
+          </div>
+        </div>
+        
+        <div *ngIf="analysisResult.riskAssessment.recommendations.length > 0" class="risk-recommendations">
+          <strong>🔧 Risiko-Minimierung:</strong>
           <ul>
-            <li>📝 Automatische Zusammenfassung</li>
-            <li>🔍 Schlüsselwort-Extraktion</li>
-            <li>💻 Technologie-Empfehlungen</li>
-            <li>📊 Sentiment-Analyse</li>
-            <li>🎯 Komplexitätsbewertung</li>
+            <li *ngFor="let rec of analysisResult.riskAssessment.recommendations">{{ rec }}</li>
           </ul>
         </div>
       </div>
+
+      <!-- Technology Stack Recommendations -->
+      <div class="result-section tech-stack">
+        <h4>🛠️ Empfohlener Technology Stack</h4>
+        <div class="tech-stack-grid">
+          <div class="tech-category">
+            <h5>🎨 Frontend</h5>
+            <div class="tech-items">
+              <span *ngFor="let tech of analysisResult.recommendedStack.frontend" class="tech-tag frontend">{{ tech }}</span>
+            </div>
+          </div>
+          <div class="tech-category">
+            <h5>⚙️ Backend</h5>
+            <div class="tech-items">
+              <span *ngFor="let tech of analysisResult.recommendedStack.backend" class="tech-tag backend">{{ tech }}</span>
+            </div>
+          </div>
+          <div class="tech-category">
+            <h5>🗄️ Database</h5>
+            <div class="tech-items">
+              <span *ngFor="let tech of analysisResult.recommendedStack.database" class="tech-tag database">{{ tech }}</span>
+            </div>
+          </div>
+          <div class="tech-category">
+            <h5>☁️ Infrastructure</h5>
+            <div class="tech-items">
+              <span *ngFor="let tech of analysisResult.recommendedStack.infrastructure" class="tech-tag infrastructure">{{ tech }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Success Metrics & KPIs -->
+      <div class="result-section success-metrics">
+        <h4>📊 Erfolgs-Metriken & KPIs</h4>
+        <div class="metrics-grid">
+          <div *ngFor="let metric of analysisResult.successMetrics" class="metric-item">
+            <div class="metric-name">{{ metric.name }}</div>
+            <div class="metric-current">Aktuell: <strong>{{ metric.current }}</strong></div>
+            <div class="metric-target">Ziel: <strong>{{ metric.target }}</strong></div>
+            <div class="metric-improvement">{{ metric.improvement }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Export Options -->
+      <div class="result-section export-options">
+        <h4>📤 Ergebnisse exportieren & teilen</h4>
+        <div class="export-buttons">
+          <button class="btn btn-secondary" (click)="exportToPDF()">
+            📄 PDF-Report
+          </button>
+          <button class="btn btn-secondary" (click)="exportToExcel()">
+            📊 Excel-Analyse
+          </button>
+          <button class="btn btn-secondary" (click)="exportToJSON()">
+            🔧 JSON-Daten
+          </button>
+          <button class="btn btn-primary" (click)="shareResults()">
+            🔗 Ergebnisse teilen
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- Fortschritt -->
-  <div class="progress-section" *ngIf="isProcessing">
-    <h3>🔄 Analyse läuft...</h3>
-    <p>Bitte warten Sie, während {{ selectedFile ? 'Ihr Dokument' : 'Ihr Text' }} analysiert wird.</p>
-    <div class="progress-bar">
-      <div class="progress-fill"></div>
-    </div>
-  </div>
-
-  <!-- Fehler-Anzeige -->
-  <div class="error-card" *ngIf="uploadError">
-    <div class="error-content">
-      <strong>❌ Fehler:</strong>
-      <p>{{ uploadError }}</p>
-      <button class="retry-btn" (click)="clearError()">🔄 Erneut versuchen</button>
-    </div>
-  </div>
-
-  <!-- Analyse-Ergebnisse -->
-  <div class="results-section" *ngIf="analysisResult && !isProcessing">
-    <div class="results-header">
-      <h3>📊 Analyse-Ergebnis</h3>
-      <div class="result-source">
-        <span class="source-badge" *ngIf="selectedFile">📄 Dokument</span>
-        <span class="source-badge" *ngIf="!selectedFile && inputText">✍️ Text</span>
+  <!-- Feedback Section -->
+  <div *ngIf="showFeedback && analysisResult && !feedbackSubmitted" class="feedback-section">
+    <div class="card card-large">
+      <h4>📝 Wie bewerten Sie diese Analyse?</h4>
+      <p class="feedback-description">Ihr Feedback hilft uns, die KI-Analyse kontinuierlich zu verbessern.</p>
+      
+      <!-- Star Rating -->
+      <div class="star-rating">
+        <span *ngFor="let star of getStars()" 
+              class="star" 
+              [class.filled]="star <= feedbackRating"
+              [class.hover]="star <= feedbackRating"
+              (click)="setFeedbackRating(star)"
+              (mouseenter)="feedbackRating = star"
+              [title]="star + '/5 Sterne'">⭐</span>
       </div>
-    </div>
-
-    <!-- Zusammenfassung -->
-    <div class="result-card" *ngIf="analysisResult.summary">
-      <h4>📝 Zusammenfassung</h4>
-      <p>{{ analysisResult.summary }}</p>
-    </div>
-
-    <!-- Schlüsselwörter -->
-    <div class="result-card" *ngIf="analysisResult.keywords?.length">
-      <h4>🔍 Schlüsselwörter</h4>
-      <div class="keyword-tags">
-        <span class="keyword-tag" *ngFor="let keyword of analysisResult.keywords">{{ keyword }}</span>
+      
+      <!-- Rating Labels -->
+      <div class="rating-labels">
+        <span *ngIf="feedbackRating === 1" class="rating-label poor">Schlecht</span>
+        <span *ngIf="feedbackRating === 2" class="rating-label fair">Okay</span>
+        <span *ngIf="feedbackRating === 3" class="rating-label good">Gut</span>
+        <span *ngIf="feedbackRating === 4" class="rating-label very-good">Sehr gut</span>
+        <span *ngIf="feedbackRating === 5" class="rating-label excellent">Ausgezeichnet</span>
       </div>
-    </div>
-
-    <!-- Technologie-Empfehlungen -->
-    <div class="result-card" *ngIf="analysisResult.suggestedComponents?.length">
-      <h4>💻 Technologie-Empfehlungen</h4>
-      <div class="tech-recommendations">
-        <span class="tech-tag" *ngFor="let tech of analysisResult.suggestedComponents">{{ tech }}</span>
-      </div>
-    </div>
-
-    <!-- Einfaches Feedback -->
-    <div class="simple-feedback">
-      <h4>💬 War diese Analyse hilfreich?</h4>
+      
+      <!-- Comment -->
+      <textarea [(ngModel)]="feedbackComment" 
+                class="feedback-textarea"
+                placeholder="Optionaler Kommentar: Was hat Ihnen gefallen? Was könnte verbessert werden?"
+                rows="3">
+      </textarea>
+      
+      <!-- Submit Buttons -->
       <div class="feedback-buttons">
-        <button class="btn-helpful" (click)="submitQuickFeedback(true)">
-          👍 Ja, hilfreich
+        <button class="btn btn-primary" 
+                [disabled]="feedbackRating === 0"
+                (click)="submitFeedback()">
+          Feedback senden
         </button>
-        <button class="btn-not-helpful" (click)="submitQuickFeedback(false)">
-          👎 Nicht hilfreich
+        <button class="btn btn-secondary" (click)="closeFeedback()">
+          Überspringen
         </button>
       </div>
     </div>
+  </div>
 
-    <!-- Aktionen -->
-    <div class="result-actions">
-      <button class="action-btn" (click)="exportResults()">
-        💾 Ergebnis exportieren
-      </button>
-      <button class="action-btn" (click)="startNewAnalysis()">
-        🔄 Neue Analyse
-      </button>
+  <!-- Feedback Success -->
+  <div *ngIf="feedbackSubmitted" class="feedback-success">
+    <div class="card card-large success-card">
+      <div class="success-content">
+        <div class="success-icon">✅</div>
+        <h4>Vielen Dank für Ihr Feedback!</h4>
+        <p>Ihre Bewertung hilft uns, die KI-Analyse kontinuierlich zu verbessern.</p>
+        <button class="btn btn-primary" (click)="closeFeedback()">
+          Neue Analyse starten
+        </button>
+      </div>
     </div>
   </div>
 </div>
