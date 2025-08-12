@@ -1,4 +1,4 @@
-// src/app/services/api.service.ts
+import { environment } from  '../../environments/environment';
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
@@ -19,7 +19,7 @@ export interface ApiFeedbackData {
   providedIn: 'root'
 })
 export class ApiService {
-  private baseUrl = 'http://localhost:8080/api';
+  private baseUrl = environment.apiUrl;
   private httpOptions = {
     headers: new HttpHeaders({
       'Content-Type': 'application/json'
