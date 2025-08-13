@@ -1,16 +1,11 @@
 package com.bits.aidocassist.controller;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.Instant;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
@@ -18,24 +13,14 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.multipart.MultipartFile;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.bits.aidocassist.model.AnalysisFeedback;
 import com.bits.aidocassist.model.Document;
@@ -47,29 +32,34 @@ import com.bits.aidocassist.util.PdfProcessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Optimierter Document Controller mit erweiterten Analyse-Features
- * Unterstützt Batch-Verarbeitung, Echtzeit-Analyse und Feedback-Integration
+ * Optimierter Document Controller mit erweiterten Analyse-Features.
+ * Achtung: KEINE Legacy-Endpunkte in dieser Klasse (separat, s. unten).
  */
+@Validated
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping(path = "/api/documents", produces = MediaType.APPLICATION_JSON_VALUE)
 public class DocumentController {
 
     private static final Logger logger = LoggerFactory.getLogger(DocumentController.class);
 
-    @Autowired
-    private DocumentService documentService;
+    private final DocumentService documentService;
+    private final AiService aiService;
+    private final TextPreprocessingService preprocessingService;
+    private final FeedbackService feedbackService;
+    private final ObjectMapper objectMapper;
 
-    @Autowired
-    private AiService aiService;
-
-    @Autowired
-    private TextPreprocessingService preprocessingService;
-
-    @Autowired
-    private FeedbackService feedbackService;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    public DocumentController(
+            DocumentService documentService,
+            AiService aiService,
+            TextPreprocessingService preprocessingService,
+            FeedbackService feedbackService,
+            ObjectMapper objectMapper) {
+        this.documentService = documentService;
+        this.aiService = aiService;
+        this.preprocessingService = preprocessingService;
+        this.feedbackService = feedbackService;
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${spring.servlet.multipart.max-file-size:10MB}")
     private String maxFileSize;
@@ -82,177 +72,162 @@ public class DocumentController {
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/csv",
             "application/json",
-            "text/markdown");
+            "text/markdown"
+    );
 
     /**
-     * OPTIMIERT: Einzeldokument-Upload mit umfassender Analyse
+     * Einzeldokument-Upload mit Analyse.
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AnalysisResponse> createDocument(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "analysisOptions", required = false) String analysisOptionsJson) {
 
-        logger.info("📄 Dokument-Upload gestartet: {}", file.getOriginalFilename());
+        final Instant t0 = Instant.now();
+        final String originalName = file != null ? file.getOriginalFilename() : null;
+        logger.info("📄 Dokument-Upload gestartet: {}", originalName);
 
         try {
-            // Validierung
             ValidationResult validation = validateFile(file);
             if (!validation.isValid()) {
                 return ResponseEntity.badRequest()
-                        .body(new AnalysisResponse(null, validation.getErrorMessage(), null));
+                        .body(new AnalysisResponse(null, validation.getErrorMessage(), Map.of()));
             }
 
-            // Parse Analyse-Optionen
             AnalysisOptions options = parseAnalysisOptions(analysisOptionsJson);
 
-            // Text-Extraktion mit Format-Erkennung
             String rawContent = extractTextFromFile(file);
-
-            // Preprocessing für bessere Analyse-Qualität
             String processedContent = preprocessingService.preprocessText(rawContent);
+            TextPreprocessingService.PreprocessingResult preprocessResult =
+                    preprocessingService.getPreprocessingResult(rawContent, processedContent);
 
-            // Qualitäts-Check
-            TextPreprocessingService.PreprocessingResult preprocessResult = preprocessingService
-                    .getPreprocessingResult(rawContent, processedContent);
-
-            logger.info("📊 Text-Preprocessing abgeschlossen: {} Zeichen -> {} Zeichen, Sprache: {}",
+            logger.info("📊 Preprocessing: {} -> {} chars, lang={}",
                     rawContent.length(), processedContent.length(), preprocessResult.detectedLanguage);
 
-            // Parallele AI-Analyse für bessere Performance
-            CompletableFuture<String> summaryFuture = CompletableFuture
-                    .supplyAsync(() -> options.generateSummary ? aiService.summarizeText(processedContent) : null);
+            CompletableFuture<String> summaryFuture = CompletableFuture.supplyAsync(
+                    () -> options.generateSummary ? aiService.summarizeText(processedContent) : null);
 
-            CompletableFuture<String> keywordsFuture = CompletableFuture
-                    .supplyAsync(() -> options.extractKeywords ? aiService.extractKeywords(processedContent) : null);
+            CompletableFuture<String> keywordsFuture = CompletableFuture.supplyAsync(
+                    () -> options.extractKeywords ? aiService.extractKeywords(processedContent) : null);
 
             CompletableFuture<String> componentsFuture = CompletableFuture.supplyAsync(
                     () -> options.suggestComponents ? aiService.suggestComponents(processedContent) : null);
 
-            // Warte auf alle Analysen
             CompletableFuture.allOf(summaryFuture, keywordsFuture, componentsFuture).join();
 
-            // Document-Objekt erstellen
             Document document = new Document();
-            document.setFilename(file.getOriginalFilename());
+            document.setFilename(originalName);
             document.setFileType(file.getContentType());
-            document.setTitle(extractTitle(file.getOriginalFilename(), processedContent));
+            document.setTitle(extractTitle(originalName, processedContent));
             document.setContent(processedContent);
             document.setUploadDate(new Date());
 
-            // AI-Analyse-Ergebnisse setzen
             document.setSummary(summaryFuture.get());
             document.setKeywords(keywordsFuture.get());
             document.setSuggestedComponents(componentsFuture.get());
 
-            // Erweiterte Metadaten
             document.setDocumentType(detectDocumentType(processedContent));
             document.setComplexityLevel(calculateComplexity(preprocessResult));
             document.setQualityScore(calculateQualityScore(preprocessResult));
 
-            // Speichern
-            Document savedDocument = documentService.saveDocument(document);
+            Document saved = documentService.saveDocument(document);
 
-            // Response mit zusätzlichen Metadaten
-            AnalysisResponse response = new AnalysisResponse(
-                    savedDocument,
+            AnalysisResponse resp = new AnalysisResponse(
+                    saved,
                     "Analyse erfolgreich abgeschlossen",
-                    buildAnalysisMetadata(preprocessResult, savedDocument));
+                    buildAnalysisMetadata(preprocessResult, saved)
+            );
+            resp.setProcessingTimeMs(java.time.Duration.between(t0, Instant.now()).toMillis());
 
-            logger.info("✅ Dokument erfolgreich analysiert und gespeichert: ID={}", savedDocument.getId());
-
-            return ResponseEntity.ok(response);
+            logger.info("✅ Dokument analysiert & gespeichert: id={}", saved.getId());
+            return ResponseEntity.ok(resp);
 
         } catch (Exception e) {
-            logger.error("❌ Fehler bei Dokumentenverarbeitung: ", e);
+            logger.error("❌ Fehler bei Dokumentenverarbeitung:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AnalysisResponse(null, "Fehler bei der Verarbeitung: " + e.getMessage(), null));
+                    .body(new AnalysisResponse(null, "Fehler bei der Verarbeitung: " + e.getMessage(), Map.of()));
         }
     }
 
     /**
-     * NEU: Batch-Upload für mehrere Dokumente
+     * Batch-Upload (max 10 Dateien).
      */
-    @PostMapping("/batch")
+    @PostMapping(path = "/batch", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<BatchAnalysisResponse> processBatch(
             @RequestParam("files") MultipartFile[] files,
             @RequestParam(value = "analysisOptions", required = false) String analysisOptionsJson) {
 
-        logger.info("📦 Batch-Upload gestartet: {} Dateien", files.length);
-
+        if (files == null || files.length == 0) {
+            return ResponseEntity.badRequest()
+                    .body(new BatchAnalysisResponse(List.of(), "Keine Dateien übermittelt", 0, 0));
+        }
         if (files.length > 10) {
             return ResponseEntity.badRequest()
-                    .body(new BatchAnalysisResponse(null, "Maximal 10 Dateien gleichzeitig erlaubt", 0, files.length));
+                    .body(new BatchAnalysisResponse(List.of(), "Maximal 10 Dateien gleichzeitig erlaubt", 0, files.length));
         }
 
-        AnalysisOptions options = parseAnalysisOptions(analysisOptionsJson);
-        List<Document> processedDocuments = new ArrayList<>();
-        List<String> errors = new ArrayList<>();
+        logger.info("📦 Batch-Upload gestartet: {} Dateien", files.length);
 
-        // Parallele Verarbeitung für bessere Performance
-        List<CompletableFuture<Document>> futures = Arrays.stream(files)
-                .map(file -> CompletableFuture.supplyAsync(() -> {
+        AnalysisOptions options = parseAnalysisOptions(analysisOptionsJson);
+        List<Document> processedDocuments = Collections.synchronizedList(new ArrayList<>());
+        List<String> errors = Collections.synchronizedList(new ArrayList<>());
+
+        List<CompletableFuture<Void>> futures = Arrays.stream(files)
+                .map(file -> CompletableFuture.runAsync(() -> {
                     try {
-                        return processFile(file, options);
+                        ValidationResult validation = validateFile(file);
+                        if (!validation.isValid()) {
+                            errors.add(file.getOriginalFilename() + ": " + validation.getErrorMessage());
+                            return;
+                        }
+                        Document doc = processFile(file, options);
+                        processedDocuments.add(doc);
                     } catch (Exception e) {
                         logger.error("Fehler bei Datei {}: {}", file.getOriginalFilename(), e.getMessage());
                         errors.add(file.getOriginalFilename() + ": " + e.getMessage());
-                        return null;
                     }
                 }))
-                .collect(Collectors.toList());
+                .toList();
 
-        // Warte auf alle Verarbeitungen
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
-
-        // Sammle Ergebnisse
-        futures.forEach(future -> {
-            try {
-                Document doc = future.get();
-                if (doc != null) {
-                    processedDocuments.add(doc);
-                }
-            } catch (Exception e) {
-                logger.error("Fehler beim Abrufen des Ergebnisses: ", e);
-            }
-        });
 
         BatchAnalysisResponse response = new BatchAnalysisResponse(
                 processedDocuments,
                 errors.isEmpty() ? "Alle Dokumente erfolgreich verarbeitet" : "Verarbeitung mit Fehlern abgeschlossen",
                 processedDocuments.size(),
-                files.length);
+                files.length
+        );
+        response.setErrors(errors);
 
-        logger.info("✅ Batch-Verarbeitung abgeschlossen: {}/{} erfolgreich",
-                processedDocuments.size(), files.length);
-
+        logger.info("✅ Batch-Verarbeitung: {}/{} erfolgreich", processedDocuments.size(), files.length);
         return ResponseEntity.ok(response);
     }
 
     /**
-     * OPTIMIERT: Direkte Text-Analyse ohne Datei-Upload
+     * Direkte Text-Analyse ohne Datei-Upload.
      */
-    @PostMapping("/analyze-text")
+    @PostMapping(path = "/analyze-text", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<AnalysisResponse> analyzeText(@RequestBody @Valid TextAnalysisRequest request) {
+        final Instant t0 = Instant.now();
 
-        logger.info("📝 Direkt-Text-Analyse gestartet: {} Zeichen", request.getText().length());
+        String input = Objects.requireNonNullElse(request.getText(), "");
+        logger.info("📝 Direkt-Text-Analyse gestartet: {} Zeichen", input.length());
 
         try {
-            // Text-Preprocessing
-            String processedText = preprocessingService.preprocessText(request.getText());
-            TextPreprocessingService.PreprocessingResult preprocessResult = preprocessingService
-                    .getPreprocessingResult(request.getText(), processedText);
+            String processedText = preprocessingService.preprocessText(input);
+            TextPreprocessingService.PreprocessingResult preprocessResult =
+                    preprocessingService.getPreprocessingResult(input, processedText);
 
-            // AI-Analyse basierend auf Optionen
-            AnalysisOptions options = request.getOptions() != null ? request.getOptions()
-                    : AnalysisOptions.defaultOptions();
+            AnalysisOptions options = request.getOptions() != null ? request.getOptions() : AnalysisOptions.defaultOptions();
 
-            String summary = options.generateSummary ? aiService.summarizeText(processedText) : null;
-            String keywords = options.extractKeywords ? aiService.extractKeywords(processedText) : null;
-            String components = options.suggestComponents ? aiService.suggestComponents(processedText) : null;
+            String summary   = options.generateSummary   ? aiService.summarizeText(processedText)   : null;
+            String keywords  = options.extractKeywords   ? aiService.extractKeywords(processedText) : null;
+            String components= options.suggestComponents ? aiService.suggestComponents(processedText): null;
 
-            // Document erstellen
             Document document = new Document();
             document.setTitle(request.getTitle() != null ? request.getTitle() : "Direkt-Analyse");
+            document.setFilename(request.getTitle()); // optional für Frontend-Kompatibilität
+            document.setFileType("text/plain");
             document.setContent(processedText);
             document.setSummary(summary);
             document.setKeywords(keywords);
@@ -262,154 +237,81 @@ public class DocumentController {
             document.setComplexityLevel(calculateComplexity(preprocessResult));
             document.setQualityScore(calculateQualityScore(preprocessResult));
 
-            // Speichern wenn gewünscht
             if (request.isSaveDocument()) {
                 document = documentService.saveDocument(document);
-                logger.info("💾 Dokument gespeichert mit ID: {}", document.getId());
+                logger.info("💾 Dokument gespeichert: id={}", document.getId());
             }
 
-            AnalysisResponse response = new AnalysisResponse(
+            AnalysisResponse resp = new AnalysisResponse(
                     document,
                     "Text-Analyse erfolgreich",
-                    buildAnalysisMetadata(preprocessResult, document));
+                    buildAnalysisMetadata(preprocessResult, document)
+            );
+            resp.setProcessingTimeMs(java.time.Duration.between(t0, Instant.now()).toMillis());
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(resp);
 
         } catch (Exception e) {
-            logger.error("❌ Fehler bei Text-Analyse: ", e);
+            logger.error("❌ Fehler bei Text-Analyse:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AnalysisResponse(null, "Analysefehler: " + e.getMessage(), null));
+                    .body(new AnalysisResponse(null, "Analysefehler: " + e.getMessage(), Map.of()));
         }
     }
 
     /**
-     * NEU: Echtzeit-Analyse während der Eingabe
+     * Echtzeit-Analyse während der Eingabe (leichtgewichtige Heuristiken).
      */
-    @PostMapping("/analyze-realtime")
-    public ResponseEntity<RealtimeAnalysisResponse> analyzeRealtime(@RequestBody RealtimeAnalysisRequest request) {
-
+    @PostMapping(path = "/analyze-realtime", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<RealtimeAnalysisResponse> analyzeRealtime(@RequestBody @Valid RealtimeAnalysisRequest request) {
         try {
-            String text = request.getText();
+            String text = Objects.requireNonNullElse(request.getText(), "");
 
-            // Schnelle Basis-Analyse
-            Map<String, Object> quickAnalysis = new HashMap<>();
+            Map<String, Object> quick = new HashMap<>();
+            String[] words = text.isBlank() ? new String[0] : text.trim().split("\\s+");
+            String[] sentences = text.isBlank() ? new String[0] : text.split("[.!?]+");
 
-            // Wort- und Zeichenzählung
-            quickAnalysis.put("wordCount", text.split("\\s+").length);
-            quickAnalysis.put("charCount", text.length());
+            quick.put("wordCount", words.length);
+            quick.put("charCount", text.length());
+            quick.put("language", preprocessingService.detectLanguage(text));
+            quick.put("sentiment", preprocessingService.detectSentimentIndicators(text));
+            quick.put("topKeywords", preprocessingService.extractKeywords(text, 5));
 
-            // Sprache erkennen
-            quickAnalysis.put("language", preprocessingService.detectLanguage(text));
+            long techTermCount = Arrays.stream(words).filter(this::isTechnicalTerm).count();
+            quick.put("technicalTerms", techTermCount);
 
-            // Sentiment-Indikatoren
-            Map<String, Integer> sentiment = preprocessingService.detectSentimentIndicators(text);
-            quickAnalysis.put("sentiment", sentiment);
-
-            // Top Keywords (schnell)
-            List<String> topKeywords = preprocessingService.extractKeywords(text, 5);
-            quickAnalysis.put("topKeywords", topKeywords);
-
-            // Technische Begriffe zählen
-            long techTermCount = Arrays.stream(text.split("\\s+"))
-                    .filter(word -> isTechnicalTerm(word))
-                    .count();
-            quickAnalysis.put("technicalTerms", techTermCount);
-
-            RealtimeAnalysisResponse response = new RealtimeAnalysisResponse(
-                    quickAnalysis,
+            RealtimeAnalysisResponse resp = new RealtimeAnalysisResponse(
+                    quick,
                     calculateReadabilityScore(text),
-                    suggestImprovements(text));
+                    suggestImprovements(text)
+            );
+            // Kompatibilität: sentiment auch als Feld setzen
+            @SuppressWarnings("unchecked")
+            Map<String, Integer> sentiment = (Map<String, Integer>) quick.get("sentiment");
+            resp.setSentiment(sentiment);
 
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(resp);
 
         } catch (Exception e) {
-            logger.error("Fehler bei Echtzeit-Analyse: ", e);
+            logger.error("Fehler bei Echtzeit-Analyse:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    // Add this to your existing DocumentController class or create a separate
-    // controller
-
     /**
-     * LEGACY ENDPOINTS - Backward compatibility for old frontend calls
-     * These delegate to the main endpoints while maintaining the old API structure
-     */
-    @RestController
-    @RequestMapping("/api/analyze")
-    @CrossOrigin(origins = "http://localhost:4200") // Enable CORS for Angular
-    public class LegacyAnalyzeController {
-
-        private static final Logger logger = LoggerFactory.getLogger(LegacyAnalyzeController.class);
-
-        @Autowired
-        private DocumentController documentController;
-
-        /**
-         * LEGACY: /api/documents -> delegates to /api/documents
-         */
-        @PostMapping("/document")
-        public ResponseEntity<DocumentController.AnalysisResponse> analyzeDocumentLegacy(
-                @RequestParam("file") MultipartFile file,
-                @RequestParam(value = "analysisOptions", required = false) String analysisOptionsJson) {
-
-            logger.info("🔄 Legacy endpoint called: /api/documents -> delegating to /api/documents");
-
-            // Delegate to the main document controller
-            return documentController.createDocument(file, analysisOptionsJson);
-        }
-
-        /**
-         * LEGACY: /api/documents/analyze-realtime -> delegates to
-         * /api/documents/analyze-realtime
-         */
-        @PostMapping("/text")
-        public ResponseEntity<DocumentController.AnalysisResponse> analyzeTextLegacy(
-                @RequestBody @Valid DocumentController.TextAnalysisRequest request) {
-
-            logger.info(
-                    "🔄 Legacy endpoint called: /api/documents/analyze-realtime -> delegating to /api/documents/analyze-realtime");
-
-            // Delegate to the main document controller
-            return documentController.analyzeText(request);
-        }
-
-        /**
-         * LEGACY: /api/documents/analyze-realtime (simple string version)
-         * For backward compatibility with simple text submissions
-         */
-        @PostMapping(value = "/text", consumes = "text/plain")
-        public ResponseEntity<DocumentController.AnalysisResponse> analyzeTextSimpleLegacy(@RequestBody String text) {
-
-            logger.info(
-                    "🔄 Legacy endpoint called: /api/documents/analyze-realtime (simple) -> delegating to /api/documents/analyze-realtime");
-
-            DocumentController.TextAnalysisRequest request = new DocumentController.TextAnalysisRequest();
-            request.setText(text);
-            request.setSaveDocument(true);
-
-            return documentController.analyzeText(request);
-        }
-    }
-
-    /**
-     * ERWEITERT: Dokument abrufen mit Analyse-Historie
+     * Dokument + Historie.
      */
     @GetMapping("/{id}")
     public ResponseEntity<DocumentWithHistory> getDocument(@PathVariable Long id) {
-
         Document document = documentService.getDocumentById(id);
         if (document == null) {
             return ResponseEntity.notFound().build();
         }
 
-        // Lade Feedback-Historie
         List<AnalysisFeedback> feedbackHistory = feedbackService.getFeedbackForDocument(id);
-
-        // Berechne durchschnittliche Bewertungen
         double avgRating = feedbackHistory.stream()
-                .filter(f -> f.getOverallRating() != null)
-                .mapToInt(AnalysisFeedback::getOverallRating)
+                .map(AnalysisFeedback::getOverallRating)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
                 .average()
                 .orElse(0.0);
 
@@ -423,61 +325,39 @@ public class DocumentController {
     }
 
     /**
-     * NEU: Re-Analyse eines existierenden Dokuments
+     * Re-Analyse des bestehenden Dokuments.
      */
     @PostMapping("/{id}/reanalyze")
     public ResponseEntity<AnalysisResponse> reanalyzeDocument(
             @PathVariable Long id,
             @RequestParam(value = "options", required = false) String optionsJson) {
 
-        logger.info("🔄 Re-Analyse für Dokument ID: {}", id);
+        logger.info("🔄 Re-Analyse für Dokument id={}", id);
 
         Document document = documentService.getDocumentById(id);
-        if (document == null) {
-            return ResponseEntity.notFound().build();
-        }
+        if (document == null) return ResponseEntity.notFound().build();
 
         try {
             AnalysisOptions options = parseAnalysisOptions(optionsJson);
+            String content = Objects.requireNonNullElse(document.getContent(), "");
 
-            // Nutze vorhandenen Content für neue Analyse
-            String content = document.getContent();
+            if (options.generateSummary)   document.setSummary(aiService.summarizeText(content));
+            if (options.extractKeywords)   document.setKeywords(aiService.extractKeywords(content));
+            if (options.suggestComponents) document.setSuggestedComponents(aiService.suggestComponents(content));
 
-            // Neue AI-Analyse
-            if (options.generateSummary) {
-                document.setSummary(aiService.summarizeText(content));
-            }
-            if (options.extractKeywords) {
-                document.setKeywords(aiService.extractKeywords(content));
-            }
-            if (options.suggestComponents) {
-                document.setSuggestedComponents(aiService.suggestComponents(content));
-            }
-
-            // Aktualisiere Metadaten
             document.setUploadDate(new Date());
+            Document updated = documentService.saveDocument(document);
 
-            // Speichere Änderungen
-            Document updatedDocument = documentService.saveDocument(document);
-
-            AnalysisResponse response = new AnalysisResponse(
-                    updatedDocument,
-                    "Dokument erfolgreich neu analysiert",
-                    null);
-
-            logger.info("✅ Re-Analyse abgeschlossen für ID: {}", id);
-
-            return ResponseEntity.ok(response);
-
+            return ResponseEntity.ok(new AnalysisResponse(updated, "Dokument erfolgreich neu analysiert", Map.of()));
         } catch (Exception e) {
-            logger.error("❌ Fehler bei Re-Analyse: ", e);
+            logger.error("❌ Fehler bei Re-Analyse:", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new AnalysisResponse(null, "Re-Analyse fehlgeschlagen: " + e.getMessage(), null));
+                    .body(new AnalysisResponse(null, "Re-Analyse fehlgeschlagen: " + e.getMessage(), Map.of()));
         }
     }
 
     /**
-     * NEU: Vergleiche zwei Dokumente
+     * Vergleich zweier Dokumente (null-sicher).
      */
     @GetMapping("/compare")
     public ResponseEntity<DocumentComparison> compareDocuments(
@@ -486,149 +366,124 @@ public class DocumentController {
 
         Document doc1 = documentService.getDocumentById(id1);
         Document doc2 = documentService.getDocumentById(id2);
+        if (doc1 == null || doc2 == null) return ResponseEntity.notFound().build();
 
-        if (doc1 == null || doc2 == null) {
-            return ResponseEntity.notFound().build();
-        }
+        Set<String> keywords1 = toKeywordSet(doc1.getKeywords());
+        Set<String> keywords2 = toKeywordSet(doc2.getKeywords());
 
-        DocumentComparison comparison = new DocumentComparison();
-        comparison.setDocument1(doc1);
-        comparison.setDocument2(doc2);
+        Set<String> common = new HashSet<>(keywords1);
+        common.retainAll(keywords2);
 
-        // Vergleiche Keywords
-        Set<String> keywords1 = new HashSet<>(Arrays.asList(doc1.getKeywords().split(", ")));
-        Set<String> keywords2 = new HashSet<>(Arrays.asList(doc2.getKeywords().split(", ")));
+        Set<String> unique1 = new HashSet<>(keywords1);
+        unique1.removeAll(keywords2);
 
-        Set<String> commonKeywords = new HashSet<>(keywords1);
-        commonKeywords.retainAll(keywords2);
+        Set<String> unique2 = new HashSet<>(keywords2);
+        unique2.removeAll(keywords1);
 
-        Set<String> uniqueToDoc1 = new HashSet<>(keywords1);
-        uniqueToDoc1.removeAll(keywords2);
+        double denom = (keywords1.size() + keywords2.size() - common.size());
+        double similarity = denom == 0 ? 0.0 : (double) common.size() / denom;
 
-        Set<String> uniqueToDoc2 = new HashSet<>(keywords2);
-        uniqueToDoc2.removeAll(keywords1);
+        DocumentComparison cmp = new DocumentComparison();
+        cmp.setDocument1(doc1);
+        cmp.setDocument2(doc2);
+        cmp.setCommonKeywords(common);
+        cmp.setUniqueToDoc1(unique1);
+        cmp.setUniqueToDoc2(unique2);
+        cmp.setSimilarityScore(similarity);
 
-        comparison.setCommonKeywords(commonKeywords);
-        comparison.setUniqueToDoc1(uniqueToDoc1);
-        comparison.setUniqueToDoc2(uniqueToDoc2);
-
-        // Ähnlichkeits-Score berechnen
-        double similarity = (double) commonKeywords.size() /
-                (keywords1.size() + keywords2.size() - commonKeywords.size());
-        comparison.setSimilarityScore(similarity);
-
-        return ResponseEntity.ok(comparison);
+        return ResponseEntity.ok(cmp);
     }
 
-    // ========================================
-    // HILFSMETHODEN
-    // ========================================
+    // ========================
+    // Hilfsmethoden
+    // ========================
 
-    /**
-     * Validiert hochgeladene Dateien
-     */
+    private Set<String> toKeywordSet(String kw) {
+        if (kw == null || kw.isBlank()) return Set.of();
+        return Arrays.stream(kw.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toSet());
+    }
+
     private ValidationResult validateFile(MultipartFile file) {
         ValidationResult result = new ValidationResult();
 
-        // Prüfe ob Datei leer ist
-        if (file.isEmpty()) {
+        if (file == null || file.isEmpty()) {
             result.setValid(false);
             result.setErrorMessage("Datei ist leer");
             return result;
         }
-
-        // Prüfe Dateigröße (aus Config)
         long maxSize = parseSize(maxFileSize);
         if (file.getSize() > maxSize) {
             result.setValid(false);
             result.setErrorMessage(String.format("Datei zu groß. Maximum: %s", maxFileSize));
             return result;
         }
-
-        // Prüfe Dateityp
         String contentType = file.getContentType();
         if (contentType == null || !SUPPORTED_FORMATS.contains(contentType)) {
             result.setValid(false);
             result.setErrorMessage("Dateityp nicht unterstützt. Erlaubt: PDF, TXT, DOC, DOCX, CSV, JSON, MD");
             return result;
         }
-
         result.setValid(true);
         return result;
     }
 
-    /**
-     * Extrahiert Text aus verschiedenen Dateiformaten
-     */
     private String extractTextFromFile(MultipartFile file) throws IOException {
         String contentType = file.getContentType();
         String filename = file.getOriginalFilename();
-
         logger.debug("Extrahiere Text aus {}, Typ: {}", filename, contentType);
 
-        if (contentType.equals("application/pdf")) {
-            Path tempFile = Files.createTempFile("upload", ".pdf");
-            file.transferTo(tempFile.toFile());
-            String content = PdfProcessor.extractTextFromPdf(tempFile.toFile());
-            Files.deleteIfExists(tempFile);
-            return content;
-
-        } else if (contentType.equals("text/plain") ||
-                contentType.equals("text/csv") ||
-                contentType.equals("text/markdown")) {
-            return new String(file.getBytes(), "UTF-8");
-
-        } else if (contentType.equals("application/json")) {
-            String json = new String(file.getBytes(), "UTF-8");
-            // JSON formatieren für bessere Lesbarkeit
+        if ("application/pdf".equals(contentType)) {
+            Path tmp = Files.createTempFile("upload-", ".pdf");
+            try {
+                file.transferTo(tmp.toFile());
+                return PdfProcessor.extractTextFromPdf(tmp.toFile());
+            } finally {
+                try { Files.deleteIfExists(tmp); } catch (Exception ignore) {}
+            }
+        } else if ("application/json".equals(contentType)) {
+            String json = new String(file.getBytes(), StandardCharsets.UTF_8);
             Object jsonObject = objectMapper.readValue(json, Object.class);
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(jsonObject);
-
+        } else if ("text/plain".equals(contentType)
+                || "text/csv".equals(contentType)
+                || "text/markdown".equals(contentType)) {
+            return new String(file.getBytes(), StandardCharsets.UTF_8);
         } else if (contentType.contains("word")) {
-            // TODO: Apache POI Integration für Word-Dokumente
+            // TODO: Apache POI für .doc/.docx integrieren
             return "Word-Dokument-Extraktion noch nicht implementiert";
-
         } else {
-            // Fallback: Als Text interpretieren
-            return new String(file.getBytes(), "UTF-8");
+            return new String(file.getBytes(), StandardCharsets.UTF_8);
         }
     }
 
-    /**
-     * Verarbeitet eine einzelne Datei
-     */
     private Document processFile(MultipartFile file, AnalysisOptions options) throws IOException {
         String content = extractTextFromFile(file);
-        String processedContent = preprocessingService.preprocessText(content);
+        String processed = preprocessingService.preprocessText(content);
 
         Document document = new Document();
         document.setFilename(file.getOriginalFilename());
         document.setFileType(file.getContentType());
-        document.setContent(processedContent);
+        document.setContent(processed);
         document.setUploadDate(new Date());
 
-        // AI-Analyse
-        if (options.generateSummary) {
-            document.setSummary(aiService.summarizeText(processedContent));
-        }
-        if (options.extractKeywords) {
-            document.setKeywords(aiService.extractKeywords(processedContent));
-        }
-        if (options.suggestComponents) {
-            document.setSuggestedComponents(aiService.suggestComponents(processedContent));
-        }
+        if (options.generateSummary)   document.setSummary(aiService.summarizeText(processed));
+        if (options.extractKeywords)   document.setKeywords(aiService.extractKeywords(processed));
+        if (options.suggestComponents) document.setSuggestedComponents(aiService.suggestComponents(processed));
+
+        document.setDocumentType(detectDocumentType(processed));
+        TextPreprocessingService.PreprocessingResult pr =
+                preprocessingService.getPreprocessingResult(content, processed);
+        document.setComplexityLevel(calculateComplexity(pr));
+        document.setQualityScore(calculateQualityScore(pr));
 
         return documentService.saveDocument(document);
     }
 
-    /**
-     * Parst Analyse-Optionen aus JSON
-     */
     private AnalysisOptions parseAnalysisOptions(String json) {
-        if (json == null || json.isEmpty()) {
-            return AnalysisOptions.defaultOptions();
-        }
-
+        if (json == null || json.isBlank()) return AnalysisOptions.defaultOptions();
         try {
             return objectMapper.readValue(json, AnalysisOptions.class);
         } catch (Exception e) {
@@ -637,203 +492,138 @@ public class DocumentController {
         }
     }
 
-    /**
-     * Extrahiert Titel aus Dateiname oder Inhalt
-     */
     private String extractTitle(String filename, String content) {
-        // Entferne Dateiendung
         if (filename != null) {
             int lastDot = filename.lastIndexOf('.');
-            if (lastDot > 0) {
-                return filename.substring(0, lastDot);
-            }
-            return filename;
+            return lastDot > 0 ? filename.substring(0, lastDot) : filename;
         }
-
-        // Fallback: Erste Zeile des Inhalts
         String[] lines = content.split("\n");
-        if (lines.length > 0 && lines[0].length() < 100) {
-            return lines[0].trim();
-        }
-
+        if (lines.length > 0 && lines[0].length() < 100) return lines[0].trim();
         return "Unbenanntes Dokument";
     }
 
-    /**
-     * Erkennt Dokumenttyp basierend auf Inhalt
-     */
     private String detectDocumentType(String content) {
-        String lowerContent = content.toLowerCase();
-
-        if (lowerContent.contains("requirements") || lowerContent.contains("anforderungen")) {
-            return "Anforderungsdokument";
-        } else if (lowerContent.contains("architecture") || lowerContent.contains("architektur")) {
-            return "Architekturdokument";
-        } else if (lowerContent.contains("test") || lowerContent.contains("testing")) {
-            return "Testdokument";
-        } else if (lowerContent.contains("manual") || lowerContent.contains("anleitung")) {
-            return "Handbuch";
-        } else if (lowerContent.contains("api") && lowerContent.contains("endpoint")) {
-            return "API-Dokumentation";
-        } else if (lowerContent.contains("class") || lowerContent.contains("function") ||
-                lowerContent.contains("import")) {
+        String s = content == null ? "" : content.toLowerCase();
+        if (s.contains("requirements") || s.contains("anforderungen")) return "Anforderungsdokument";
+        if (s.contains("architecture") || s.contains("architektur"))   return "Architekturdokument";
+        if (s.contains("test") || s.contains("testing"))               return "Testdokument";
+        if (s.contains("manual") || s.contains("anleitung"))           return "Handbuch";
+        if (s.contains("api") && s.contains("endpoint"))               return "API-Dokumentation";
+        if (s.contains("class") || s.contains("function") || s.contains("import"))
             return "Code-Dokumentation";
-        } else {
-            return "Technisches Dokument";
-        }
+        return "Technisches Dokument";
     }
 
-    /**
-     * Berechnet Dokumenten-Komplexität
-     */
     private String calculateComplexity(TextPreprocessingService.PreprocessingResult result) {
         double score = 0;
+        Map<String, Object> m = result != null ? result.qualityMetrics : null;
 
-        // Basierend auf verschiedenen Metriken
-        Map<String, Object> metrics = result.qualityMetrics;
+        if (m != null) {
+            Number wc = (Number) m.getOrDefault("wordCount", 0);
+            Number td = (Number) m.getOrDefault("technicalDensity", 0.0);
+            Number rd = (Number) m.getOrDefault("readabilityScore", 100.0);
 
-        if (metrics != null) {
-            Integer wordCount = (Integer) metrics.get("wordCount");
-            Double technicalDensity = (Double) metrics.get("technicalDensity");
-            Double readabilityScore = (Double) metrics.get("readabilityScore");
-
-            if (wordCount != null && wordCount > 1000)
-                score += 20;
-            if (technicalDensity != null && technicalDensity > 0.1)
-                score += 30;
-            if (readabilityScore != null && readabilityScore < 50)
-                score += 30;
-            if (result.codeBlockCount > 5)
-                score += 20;
+            if (wc.longValue() > 1000)            score += 20;
+            if (td.doubleValue() > 0.10)          score += 30;
+            if (rd.doubleValue() < 50.0)          score += 30;
+            if (result.codeBlockCount > 5)        score += 20;
         }
 
-        if (score > 70)
-            return "Experte";
-        if (score > 40)
-            return "Fortgeschritten";
+        if (score > 70) return "Experte";
+        if (score > 40) return "Fortgeschritten";
         return "Einsteiger";
     }
 
-    /**
-     * Berechnet Qualitäts-Score
-     */
     private double calculateQualityScore(TextPreprocessingService.PreprocessingResult result) {
-        if (result.qualityMetrics != null && result.qualityMetrics.containsKey("overallQualityScore")) {
-            return (Double) result.qualityMetrics.get("overallQualityScore");
+        if (result != null && result.qualityMetrics != null) {
+            Object v = result.qualityMetrics.get("overallQualityScore");
+            if (v instanceof Number n) return n.doubleValue();
         }
-        return 50.0; // Default
+        return 50.0;
     }
 
-    /**
-     * Baut Analyse-Metadaten
-     */
     private Map<String, Object> buildAnalysisMetadata(
-            TextPreprocessingService.PreprocessingResult preprocessResult,
+            TextPreprocessingService.PreprocessingResult pr,
             Document document) {
 
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("originalLength", preprocessResult.originalLength);
-        metadata.put("processedLength", preprocessResult.processedLength);
-        metadata.put("compressionRatio", preprocessResult.compressionRatio);
-        metadata.put("detectedLanguage", preprocessResult.detectedLanguage);
-        metadata.put("codeBlockCount", preprocessResult.codeBlockCount);
-        metadata.put("technicalTermCount", preprocessResult.technicalTermCount);
-        metadata.put("documentType", document.getDocumentType());
-        metadata.put("complexityLevel", document.getComplexityLevel());
-        metadata.put("qualityScore", document.getQualityScore());
-
+        if (pr != null) {
+            metadata.put("originalLength", pr.originalLength);
+            metadata.put("processedLength", pr.processedLength);
+            metadata.put("compressionRatio", pr.compressionRatio);
+            metadata.put("detectedLanguage", pr.detectedLanguage);
+            metadata.put("codeBlockCount", pr.codeBlockCount);
+            metadata.put("technicalTermCount", pr.technicalTermCount);
+        }
+        if (document != null) {
+            metadata.put("documentType", document.getDocumentType());
+            metadata.put("complexityLevel", document.getComplexityLevel());
+            metadata.put("qualityScore", document.getQualityScore());
+            // kleine Kompatibilitätshilfe fürs Frontend:
+            metadata.put("name", Optional.ofNullable(document.getTitle()).orElse(document.getFilename()));
+        }
         return metadata;
     }
 
-    /**
-     * Prüft ob ein Wort ein technischer Begriff ist
-     */
     private boolean isTechnicalTerm(String word) {
         Set<String> techTerms = Set.of(
                 "API", "REST", "JSON", "SQL", "NoSQL", "Docker", "Kubernetes",
                 "Java", "Python", "JavaScript", "React", "Angular", "Spring");
-        return techTerms.contains(word.toUpperCase());
+        return word != null && techTerms.contains(word.toUpperCase(Locale.ROOT));
     }
 
-    /**
-     * Berechnet Lesbarkeits-Score
-     */
     private double calculateReadabilityScore(String text) {
+        if (text == null || text.isBlank()) return 100.0;
         String[] sentences = text.split("[.!?]+");
-        String[] words = text.split("\\s+");
-
-        if (sentences.length == 0 || words.length == 0)
-            return 0;
-
+        String[] words = text.trim().split("\\s+");
+        if (sentences.length == 0 || words.length == 0) return 100.0;
         double avgWordsPerSentence = (double) words.length / sentences.length;
-        // Vereinfachte Flesch-Reading-Ease Formel
         return Math.max(0, Math.min(100, 206.835 - 1.015 * avgWordsPerSentence));
+        // Hinweis: stark vereinfachte Formel
     }
 
-    /**
-     * Schlägt Verbesserungen vor
-     */
     private List<String> suggestImprovements(String text) {
         List<String> suggestions = new ArrayList<>();
+        if (text == null || text.isBlank()) return suggestions;
 
         String[] sentences = text.split("[.!?]+");
-        String[] words = text.split("\\s+");
+        String[] words = text.trim().split("\\s+");
 
-        // Satzlänge prüfen
         if (sentences.length > 0) {
             double avgWordsPerSentence = (double) words.length / sentences.length;
             if (avgWordsPerSentence > 25) {
-                suggestions.add("Verwenden Sie kürzere Sätze für bessere Lesbarkeit");
+                suggestions.add("Verwenden Sie kürzere Sätze für bessere Lesbarkeit.");
             }
         }
-
-        // Absätze prüfen
-        String[] paragraphs = text.split("\n\n");
+        String[] paragraphs = text.split("\\R\\R+");
         if (paragraphs.length < 3 && words.length > 200) {
-            suggestions.add("Fügen Sie mehr Absätze zur Strukturierung hinzu");
+            suggestions.add("Fügen Sie mehr Absätze zur Strukturierung hinzu.");
         }
-
-        // Technische Begriffe
         long techTerms = Arrays.stream(words).filter(this::isTechnicalTerm).count();
         if (techTerms < 3 && words.length > 100) {
-            suggestions.add("Fügen Sie spezifische technische Details hinzu");
+            suggestions.add("Fügen Sie spezifische technische Details hinzu.");
         }
-
         return suggestions;
     }
 
-    /**
-     * Parst Größenangaben (z.B. "10MB" zu Bytes)
-     */
     private long parseSize(String size) {
-        size = size.toUpperCase().trim();
-        long multiplier = 1;
-
-        if (size.endsWith("KB")) {
-            multiplier = 1024;
-            size = size.substring(0, size.length() - 2);
-        } else if (size.endsWith("MB")) {
-            multiplier = 1024 * 1024;
-            size = size.substring(0, size.length() - 2);
-        } else if (size.endsWith("GB")) {
-            multiplier = 1024 * 1024 * 1024;
-            size = size.substring(0, size.length() - 2);
-        }
-
+        if (size == null) return 10L * 1024 * 1024;
+        String s = size.trim().toUpperCase(Locale.ROOT);
+        long mult = 1;
+        if (s.endsWith("KB")) { mult = 1024L; s = s.substring(0, s.length()-2); }
+        else if (s.endsWith("MB")) { mult = 1024L * 1024; s = s.substring(0, s.length()-2); }
+        else if (s.endsWith("GB")) { mult = 1024L * 1024 * 1024; s = s.substring(0, s.length()-2); }
         try {
-            return Long.parseLong(size.trim()) * multiplier;
+            return Long.parseLong(s.trim()) * mult;
         } catch (NumberFormatException e) {
-            return 10 * 1024 * 1024; // Default: 10MB
+            return 10L * 1024 * 1024; // Default 10MB
         }
     }
 
-    // ========================================
-    // REQUEST/RESPONSE DTOs
-    // ========================================
+    // ========================
+    // DTOs
+    // ========================
 
-    /**
-     * Analyse-Optionen
-     */
     public static class AnalysisOptions {
         private boolean generateSummary = true;
         private boolean extractKeywords = true;
@@ -842,139 +632,54 @@ public class DocumentController {
         private boolean detectLanguage = true;
         private boolean calculateMetrics = true;
 
-        public static AnalysisOptions defaultOptions() {
-            return new AnalysisOptions();
-        }
-
+        public static AnalysisOptions defaultOptions() { return new AnalysisOptions(); }
         public static AnalysisOptions fullAnalysis() {
-            AnalysisOptions options = new AnalysisOptions();
-            options.performSentimentAnalysis = true;
-            return options;
+            AnalysisOptions o = new AnalysisOptions();
+            o.performSentimentAnalysis = true;
+            return o;
         }
 
-        // Getters and Setters
-        public boolean isGenerateSummary() {
-            return generateSummary;
-        }
-
-        public void setGenerateSummary(boolean generateSummary) {
-            this.generateSummary = generateSummary;
-        }
-
-        public boolean isExtractKeywords() {
-            return extractKeywords;
-        }
-
-        public void setExtractKeywords(boolean extractKeywords) {
-            this.extractKeywords = extractKeywords;
-        }
-
-        public boolean isSuggestComponents() {
-            return suggestComponents;
-        }
-
-        public void setSuggestComponents(boolean suggestComponents) {
-            this.suggestComponents = suggestComponents;
-        }
-
-        public boolean isPerformSentimentAnalysis() {
-            return performSentimentAnalysis;
-        }
-
-        public void setPerformSentimentAnalysis(boolean performSentimentAnalysis) {
-            this.performSentimentAnalysis = performSentimentAnalysis;
-        }
-
-        public boolean isDetectLanguage() {
-            return detectLanguage;
-        }
-
-        public void setDetectLanguage(boolean detectLanguage) {
-            this.detectLanguage = detectLanguage;
-        }
-
-        public boolean isCalculateMetrics() {
-            return calculateMetrics;
-        }
-
-        public void setCalculateMetrics(boolean calculateMetrics) {
-            this.calculateMetrics = calculateMetrics;
-        }
+        public boolean isGenerateSummary() { return generateSummary; }
+        public void setGenerateSummary(boolean v) { this.generateSummary = v; }
+        public boolean isExtractKeywords() { return extractKeywords; }
+        public void setExtractKeywords(boolean v) { this.extractKeywords = v; }
+        public boolean isSuggestComponents() { return suggestComponents; }
+        public void setSuggestComponents(boolean v) { this.suggestComponents = v; }
+        public boolean isPerformSentimentAnalysis() { return performSentimentAnalysis; }
+        public void setPerformSentimentAnalysis(boolean v) { this.performSentimentAnalysis = v; }
+        public boolean isDetectLanguage() { return detectLanguage; }
+        public void setDetectLanguage(boolean v) { this.detectLanguage = v; }
+        public boolean isCalculateMetrics() { return calculateMetrics; }
+        public void setCalculateMetrics(boolean v) { this.calculateMetrics = v; }
     }
 
-    /**
-     * Text-Analyse Request
-     */
     public static class TextAnalysisRequest {
         @NotBlank(message = "Text darf nicht leer sein")
         private String text;
-
         private String title;
         private AnalysisOptions options;
         private boolean saveDocument = true;
 
-        // Getters and Setters
-        public String getText() {
-            return text;
-        }
-
-        public void setText(String text) {
-            this.text = text;
-        }
-
-        public String getTitle() {
-            return title;
-        }
-
-        public void setTitle(String title) {
-            this.title = title;
-        }
-
-        public AnalysisOptions getOptions() {
-            return options;
-        }
-
-        public void setOptions(AnalysisOptions options) {
-            this.options = options;
-        }
-
-        public boolean isSaveDocument() {
-            return saveDocument;
-        }
-
-        public void setSaveDocument(boolean saveDocument) {
-            this.saveDocument = saveDocument;
-        }
+        public String getText() { return text; }
+        public void setText(String text) { this.text = text; }
+        public String getTitle() { return title; }
+        public void setTitle(String title) { this.title = title; }
+        public AnalysisOptions getOptions() { return options; }
+        public void setOptions(AnalysisOptions options) { this.options = options; }
+        public boolean isSaveDocument() { return saveDocument; }
+        public void setSaveDocument(boolean saveDocument) { this.saveDocument = saveDocument; }
     }
 
-    /**
-     * Echtzeit-Analyse Request
-     */
     public static class RealtimeAnalysisRequest {
-        @NotNull
-        private String text;
+        @NotNull private String text;
         private String language;
 
-        public String getText() {
-            return text;
-        }
-
-        public void setText(String text) {
-            this.text = text;
-        }
-
-        public String getLanguage() {
-            return language;
-        }
-
-        public void setLanguage(String language) {
-            this.language = language;
-        }
+        public String getText() { return text; }
+        public void setText(String text) { this.text = text; }
+        public String getLanguage() { return language; }
+        public void setLanguage(String language) { this.language = language; }
     }
 
-    /**
-     * Standard Analyse Response
-     */
     public static class AnalysisResponse {
         private Document document;
         private String message;
@@ -985,55 +690,22 @@ public class DocumentController {
         public AnalysisResponse(Document document, String message, Map<String, Object> metadata) {
             this.document = document;
             this.message = message;
-            this.metadata = metadata;
+            this.metadata = metadata != null ? metadata : Map.of();
             this.timestamp = new Date();
         }
 
-        // Getters and Setters
-        public Document getDocument() {
-            return document;
-        }
-
-        public void setDocument(Document document) {
-            this.document = document;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public Map<String, Object> getMetadata() {
-            return metadata;
-        }
-
-        public void setMetadata(Map<String, Object> metadata) {
-            this.metadata = metadata;
-        }
-
-        public Long getProcessingTimeMs() {
-            return processingTimeMs;
-        }
-
-        public void setProcessingTimeMs(Long processingTimeMs) {
-            this.processingTimeMs = processingTimeMs;
-        }
-
-        public Date getTimestamp() {
-            return timestamp;
-        }
-
-        public void setTimestamp(Date timestamp) {
-            this.timestamp = timestamp;
-        }
+        public Document getDocument() { return document; }
+        public void setDocument(Document document) { this.document = document; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public Map<String, Object> getMetadata() { return metadata; }
+        public void setMetadata(Map<String, Object> metadata) { this.metadata = metadata; }
+        public Long getProcessingTimeMs() { return processingTimeMs; }
+        public void setProcessingTimeMs(Long processingTimeMs) { this.processingTimeMs = processingTimeMs; }
+        public Date getTimestamp() { return timestamp; }
+        public void setTimestamp(Date timestamp) { this.timestamp = timestamp; }
     }
 
-    /**
-     * Batch Analyse Response
-     */
     public static class BatchAnalysisResponse {
         private List<Document> documents;
         private String message;
@@ -1042,14 +714,13 @@ public class DocumentController {
         private List<String> errors;
         private Map<String, Object> statistics;
 
-        public BatchAnalysisResponse(List<Document> documents, String message,
-                int successCount, int totalCount) {
-            this.documents = documents;
+        public BatchAnalysisResponse(List<Document> documents, String message, int successCount, int totalCount) {
+            this.documents = documents != null ? documents : List.of();
             this.message = message;
             this.successCount = successCount;
             this.totalCount = totalCount;
             this.errors = new ArrayList<>();
-            this.statistics = calculateStatistics(documents);
+            this.statistics = calculateStatistics(this.documents);
         }
 
         private Map<String, Object> calculateStatistics(List<Document> docs) {
@@ -1058,125 +729,56 @@ public class DocumentController {
                 stats.put("totalDocuments", docs.size());
                 stats.put("averageQualityScore",
                         docs.stream()
-                                .filter(d -> d.getQualityScore() != null)
-                                .mapToDouble(Document::getQualityScore)
+                                .map(Document::getQualityScore)
+                                .filter(Objects::nonNull)
+                                .mapToDouble(Double::doubleValue)
                                 .average()
                                 .orElse(0.0));
-
                 Map<String, Long> typeDistribution = docs.stream()
-                        .filter(d -> d.getDocumentType() != null)
-                        .collect(Collectors.groupingBy(
-                                Document::getDocumentType,
-                                Collectors.counting()));
+                        .map(Document::getDocumentType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.groupingBy(s -> s, Collectors.counting()));
                 stats.put("documentTypes", typeDistribution);
             }
             return stats;
         }
 
-        // Getters and Setters
-        public List<Document> getDocuments() {
-            return documents;
-        }
-
-        public void setDocuments(List<Document> documents) {
-            this.documents = documents;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public void setMessage(String message) {
-            this.message = message;
-        }
-
-        public int getSuccessCount() {
-            return successCount;
-        }
-
-        public void setSuccessCount(int successCount) {
-            this.successCount = successCount;
-        }
-
-        public int getTotalCount() {
-            return totalCount;
-        }
-
-        public void setTotalCount(int totalCount) {
-            this.totalCount = totalCount;
-        }
-
-        public List<String> getErrors() {
-            return errors;
-        }
-
-        public void setErrors(List<String> errors) {
-            this.errors = errors;
-        }
-
-        public Map<String, Object> getStatistics() {
-            return statistics;
-        }
-
-        public void setStatistics(Map<String, Object> statistics) {
-            this.statistics = statistics;
-        }
+        public List<Document> getDocuments() { return documents; }
+        public void setDocuments(List<Document> documents) { this.documents = documents; }
+        public String getMessage() { return message; }
+        public void setMessage(String message) { this.message = message; }
+        public int getSuccessCount() { return successCount; }
+        public void setSuccessCount(int successCount) { this.successCount = successCount; }
+        public int getTotalCount() { return totalCount; }
+        public void setTotalCount(int totalCount) { this.totalCount = totalCount; }
+        public List<String> getErrors() { return errors; }
+        public void setErrors(List<String> errors) { this.errors = errors; }
+        public Map<String, Object> getStatistics() { return statistics; }
+        public void setStatistics(Map<String, Object> statistics) { this.statistics = statistics; }
     }
 
-    /**
-     * Echtzeit Analyse Response
-     */
     public static class RealtimeAnalysisResponse {
         private Map<String, Object> quickAnalysis;
         private double readabilityScore;
         private List<String> suggestions;
         private Map<String, Integer> sentiment;
 
-        public RealtimeAnalysisResponse(Map<String, Object> quickAnalysis,
-                double readabilityScore,
-                List<String> suggestions) {
-            this.quickAnalysis = quickAnalysis;
+        public RealtimeAnalysisResponse(Map<String, Object> quickAnalysis, double readabilityScore, List<String> suggestions) {
+            this.quickAnalysis = quickAnalysis != null ? quickAnalysis : Map.of();
             this.readabilityScore = readabilityScore;
-            this.suggestions = suggestions;
+            this.suggestions = suggestions != null ? suggestions : List.of();
         }
 
-        // Getters and Setters
-        public Map<String, Object> getQuickAnalysis() {
-            return quickAnalysis;
-        }
-
-        public void setQuickAnalysis(Map<String, Object> quickAnalysis) {
-            this.quickAnalysis = quickAnalysis;
-        }
-
-        public double getReadabilityScore() {
-            return readabilityScore;
-        }
-
-        public void setReadabilityScore(double readabilityScore) {
-            this.readabilityScore = readabilityScore;
-        }
-
-        public List<String> getSuggestions() {
-            return suggestions;
-        }
-
-        public void setSuggestions(List<String> suggestions) {
-            this.suggestions = suggestions;
-        }
-
-        public Map<String, Integer> getSentiment() {
-            return sentiment;
-        }
-
-        public void setSentiment(Map<String, Integer> sentiment) {
-            this.sentiment = sentiment;
-        }
+        public Map<String, Object> getQuickAnalysis() { return quickAnalysis; }
+        public void setQuickAnalysis(Map<String, Object> quickAnalysis) { this.quickAnalysis = quickAnalysis; }
+        public double getReadabilityScore() { return readabilityScore; }
+        public void setReadabilityScore(double readabilityScore) { this.readabilityScore = readabilityScore; }
+        public List<String> getSuggestions() { return suggestions; }
+        public void setSuggestions(List<String> suggestions) { this.suggestions = suggestions; }
+        public Map<String, Integer> getSentiment() { return sentiment; }
+        public void setSentiment(Map<String, Integer> sentiment) { this.sentiment = sentiment; }
     }
 
-    /**
-     * Dokument mit Historie
-     */
     public static class DocumentWithHistory {
         private Document document;
         private List<AnalysisFeedback> feedbackHistory;
@@ -1184,99 +786,51 @@ public class DocumentController {
         private int feedbackCount;
         private Map<String, Object> trends;
 
-        public DocumentWithHistory(Document document,
-                List<AnalysisFeedback> feedbackHistory,
-                double averageRating,
-                int feedbackCount) {
+        public DocumentWithHistory(Document document, List<AnalysisFeedback> feedbackHistory, double averageRating, int feedbackCount) {
             this.document = document;
-            this.feedbackHistory = feedbackHistory;
+            this.feedbackHistory = feedbackHistory != null ? feedbackHistory : List.of();
             this.averageRating = averageRating;
             this.feedbackCount = feedbackCount;
-            this.trends = calculateTrends(feedbackHistory);
+            this.trends = calculateTrends(this.feedbackHistory);
         }
 
         private Map<String, Object> calculateTrends(List<AnalysisFeedback> history) {
             Map<String, Object> trends = new HashMap<>();
-
             if (history != null && history.size() > 1) {
-                // Berechne Rating-Trend
                 List<Integer> ratings = history.stream()
-                        .filter(f -> f.getOverallRating() != null)
                         .map(AnalysisFeedback::getOverallRating)
-                        .collect(Collectors.toList());
-
+                        .filter(Objects::nonNull)
+                        .toList();
                 if (ratings.size() > 1) {
-                    int firstHalf = ratings.subList(0, ratings.size() / 2).stream()
-                            .mapToInt(Integer::intValue).sum();
-                    int secondHalf = ratings.subList(ratings.size() / 2, ratings.size()).stream()
-                            .mapToInt(Integer::intValue).sum();
-
-                    trends.put("ratingTrend",
-                            secondHalf > firstHalf ? "improving" : secondHalf < firstHalf ? "declining" : "stable");
+                    int mid = ratings.size() / 2;
+                    int firstHalf = ratings.subList(0, mid).stream().mapToInt(Integer::intValue).sum();
+                    int secondHalf = ratings.subList(mid, ratings.size()).stream().mapToInt(Integer::intValue).sum();
+                    trends.put("ratingTrend", secondHalf > firstHalf ? "improving" : secondHalf < firstHalf ? "declining" : "stable");
                 }
-
-                // Häufigste Verbesserungskategorie
                 Map<String, Long> categories = history.stream()
-                        .filter(f -> f.getImprovementCategory() != null)
-                        .collect(Collectors.groupingBy(
-                                AnalysisFeedback::getImprovementCategory,
-                                Collectors.counting()));
-
-                trends.put("topImprovementArea",
-                        categories.entrySet().stream()
-                                .max(Map.Entry.comparingByValue())
-                                .map(Map.Entry::getKey)
-                                .orElse("none"));
+                        .map(AnalysisFeedback::getImprovementCategory)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.groupingBy(c -> c, Collectors.counting()));
+                trends.put("topImprovementArea", categories.entrySet().stream()
+                        .max(Map.Entry.comparingByValue())
+                        .map(Map.Entry::getKey)
+                        .orElse("none"));
             }
-
             return trends;
         }
 
-        // Getters and Setters
-        public Document getDocument() {
-            return document;
-        }
-
-        public void setDocument(Document document) {
-            this.document = document;
-        }
-
-        public List<AnalysisFeedback> getFeedbackHistory() {
-            return feedbackHistory;
-        }
-
-        public void setFeedbackHistory(List<AnalysisFeedback> feedbackHistory) {
-            this.feedbackHistory = feedbackHistory;
-        }
-
-        public double getAverageRating() {
-            return averageRating;
-        }
-
-        public void setAverageRating(double averageRating) {
-            this.averageRating = averageRating;
-        }
-
-        public int getFeedbackCount() {
-            return feedbackCount;
-        }
-
-        public void setFeedbackCount(int feedbackCount) {
-            this.feedbackCount = feedbackCount;
-        }
-
-        public Map<String, Object> getTrends() {
-            return trends;
-        }
-
-        public void setTrends(Map<String, Object> trends) {
-            this.trends = trends;
-        }
+        public Document getDocument() { return document; }
+        public void setDocument(Document document) { this.document = document; }
+        public List<AnalysisFeedback> getFeedbackHistory() { return feedbackHistory; }
+        public void setFeedbackHistory(List<AnalysisFeedback> feedbackHistory) { this.feedbackHistory = feedbackHistory; }
+        public double getAverageRating() { return averageRating; }
+        public void setAverageRating(double averageRating) { this.averageRating = averageRating; }
+        public int getFeedbackCount() { return feedbackCount; }
+        public void setFeedbackCount(int feedbackCount) { this.feedbackCount = feedbackCount; }
+        public Map<String, Object> getTrends() { return trends; }
+        public void setTrends(Map<String, Object> trends) { this.trends = trends; }
     }
 
-    /**
-     * Dokument-Vergleich
-     */
     public static class DocumentComparison {
         private Document document1;
         private Document document2;
@@ -1284,118 +838,49 @@ public class DocumentController {
         private Set<String> uniqueToDoc1;
         private Set<String> uniqueToDoc2;
         private double similarityScore;
-        private Map<String, String> fieldComparison;
+        private Map<String, String> fieldComparison = new HashMap<>();
 
-        public DocumentComparison() {
-            this.fieldComparison = new HashMap<>();
-        }
-
-        // Getters and Setters
-        public Document getDocument1() {
-            return document1;
-        }
-
-        public void setDocument1(Document document1) {
-            this.document1 = document1;
-        }
-
-        public Document getDocument2() {
-            return document2;
-        }
-
-        public void setDocument2(Document document2) {
-            this.document2 = document2;
-        }
-
-        public Set<String> getCommonKeywords() {
-            return commonKeywords;
-        }
-
-        public void setCommonKeywords(Set<String> commonKeywords) {
-            this.commonKeywords = commonKeywords;
-        }
-
-        public Set<String> getUniqueToDoc1() {
-            return uniqueToDoc1;
-        }
-
-        public void setUniqueToDoc1(Set<String> uniqueToDoc1) {
-            this.uniqueToDoc1 = uniqueToDoc1;
-        }
-
-        public Set<String> getUniqueToDoc2() {
-            return uniqueToDoc2;
-        }
-
-        public void setUniqueToDoc2(Set<String> uniqueToDoc2) {
-            this.uniqueToDoc2 = uniqueToDoc2;
-        }
-
-        public double getSimilarityScore() {
-            return similarityScore;
-        }
-
-        public void setSimilarityScore(double similarityScore) {
-            this.similarityScore = similarityScore;
-        }
-
-        public Map<String, String> getFieldComparison() {
-            return fieldComparison;
-        }
-
-        public void setFieldComparison(Map<String, String> fieldComparison) {
-            this.fieldComparison = fieldComparison;
-        }
+        public Document getDocument1() { return document1; }
+        public void setDocument1(Document document1) { this.document1 = document1; }
+        public Document getDocument2() { return document2; }
+        public void setDocument2(Document document2) { this.document2 = document2; }
+        public Set<String> getCommonKeywords() { return commonKeywords; }
+        public void setCommonKeywords(Set<String> commonKeywords) { this.commonKeywords = commonKeywords; }
+        public Set<String> getUniqueToDoc1() { return uniqueToDoc1; }
+        public void setUniqueToDoc1(Set<String> uniqueToDoc1) { this.uniqueToDoc1 = uniqueToDoc1; }
+        public Set<String> getUniqueToDoc2() { return uniqueToDoc2; }
+        public void setUniqueToDoc2(Set<String> uniqueToDoc2) { this.uniqueToDoc2 = uniqueToDoc2; }
+        public double getSimilarityScore() { return similarityScore; }
+        public void setSimilarityScore(double similarityScore) { this.similarityScore = similarityScore; }
+        public Map<String, String> getFieldComparison() { return fieldComparison; }
+        public void setFieldComparison(Map<String, String> fieldComparison) { this.fieldComparison = fieldComparison; }
     }
 
-    /**
-     * Validierungs-Ergebnis
-     */
     private static class ValidationResult {
         private boolean valid;
         private String errorMessage;
-
-        public boolean isValid() {
-            return valid;
-        }
-
-        public void setValid(boolean valid) {
-            this.valid = valid;
-        }
-
-        public String getErrorMessage() {
-            return errorMessage;
-        }
-
-        public void setErrorMessage(String errorMessage) {
-            this.errorMessage = errorMessage;
-        }
+        public boolean isValid() { return valid; }
+        public void setValid(boolean valid) { this.valid = valid; }
+        public String getErrorMessage() { return errorMessage; }
+        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
     }
 
-    /**
-     * Exception Handler für bessere Fehlerbehandlung
-     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception e) {
-        logger.error("Unerwarteter Fehler: ", e);
-
+        logger.error("Unerwarteter Fehler:", e);
         ErrorResponse error = new ErrorResponse(
                 "INTERNAL_ERROR",
                 "Ein unerwarteter Fehler ist aufgetreten",
                 e.getMessage(),
                 new Date());
-
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
     }
 
-    /**
-     * Fehler-Response
-     */
     public static class ErrorResponse {
-        private String errorCode;
-        private String message;
-        private String details;
-        private Date timestamp;
+        private final String errorCode;
+        private final String message;
+        private final String details;
+        private final Date timestamp;
 
         public ErrorResponse(String errorCode, String message, String details, Date timestamp) {
             this.errorCode = errorCode;
@@ -1403,22 +888,9 @@ public class DocumentController {
             this.details = details;
             this.timestamp = timestamp;
         }
-
-        // Getters
-        public String getErrorCode() {
-            return errorCode;
-        }
-
-        public String getMessage() {
-            return message;
-        }
-
-        public String getDetails() {
-            return details;
-        }
-
-        public Date getTimestamp() {
-            return timestamp;
-        }
+        public String getErrorCode() { return errorCode; }
+        public String getMessage() { return message; }
+        public String getDetails() { return details; }
+        public Date getTimestamp() { return timestamp; }
     }
 }
