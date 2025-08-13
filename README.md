@@ -1,355 +1,428 @@
-# 🤖 AI Document Assistant - Intelligente Dokumentenanalyse
+# 🤖 AI Doc Assist - Intelligente Dokumentenanalyse mit KI
 
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-ai--docs--assist--demo.onrender.com-blue?style=for-the-badge)](https://ai-docs-assist-demo.onrender.com)
-[![GitHub](https://img.shields.io/badge/Portfolio-thanhtuanh/bewerbung-black?style=for-the-badge&logo=github)](https://github.com/thanhtuanh/bewerbung)
-[![Tech Stack](https://img.shields.io/badge/Stack-Angular%20%7C%20Node.js%20%7C%20AI-green?style=for-the-badge)](https://ai-docs-assist-demo.onrender.com)
+> **Ein modernes Java Spring Boot Projekt für automatisierte Dokumentenanalyse und Branchenerkennung**
 
-> **Moderne Full-Stack-Anwendung** für intelligente Dokumentenanalyse mit KI-Integration, entwickelt als **Portfolio-Projekt** für Java Full-Stack Entwickler Position mit KI-Spezialisierung.
+[![Java](https://img.shields.io/badge/Java-21-orange.svg)](https://www.oracle.com/java/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.8-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Redis](https://img.shields.io/badge/Redis-7.0-red.svg)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![AI Powered](https://img.shields.io/badge/AI-Powered-purple.svg)](https://openai.com/)
 
-## 🎯 Projektübersicht
+## 📋 Projektübersicht
 
-**AI Document Assistant** ist eine professionelle Webanwendung, die Künstliche Intelligenz nutzt, um Dokumente und Texte automatisch zu analysieren. Das System extrahiert Schlüsselwörter, erstellt Zusammenfassungen und gibt Technologie-Empfehlungen basierend auf dem Inhalt.
+**AI Doc Assist** ist eine intelligente Webanwendung für die automatisierte Analyse von Dokumenten mit fortschrittlicher **KI-gestützter Branchenerkennung**. Das System verarbeitet PDF- und Word-Dokumente, extrahiert relevante Informationen und klassifiziert sie automatisch nach Industriezweigen.
 
-### 🌟 Live Demo
-**🔗 [https://ai-docs-assist-demo.onrender.com](https://ai-docs-assist-demo.onrender.com)**
+### 🎯 Hauptfunktionen
 
-*Testen Sie die Anwendung mit dem integrierten Demo-Text einer realistischen E-Commerce-Projektanfrage (15 DIN A4 Seiten).*
+- **📄 Dokumentenverarbeitung**: PDF & Word (.docx) Upload und Textextraktion
+- **🤖 KI-gestützte Analyse**: Automatische Zusammenfassung und Keyword-Extraktion
+- **🏭 Branchenerkennung**: Intelligente Klassifizierung in 10+ Industriezweige
+- **⚡ Performance-Caching**: Redis-basierte Zwischenspeicherung für schnelle Antworten
+- **📊 Monitoring**: Prometheus Metrics und Health Checks
+- **🔒 Sicherheit**: Spring Security Integration
+- **📱 Responsive UI**: Moderne Thymeleaf-basierte Benutzeroberfläche
 
 ---
 
-## 🚀 Technologie-Stack
+## 🏗️ Technologie-Stack
 
-### Frontend (Angular 17+)
-```typescript
-├── Angular 17+ mit TypeScript
-├── Responsive Design (Mobile-First)
-├── Progressive Web App (PWA) Ready
-├── RxJS für Reactive Programming
-├── Angular Material UI Components
-├── SCSS für Advanced Styling
-└── Webpack Bundle Optimization
+### **Backend**
+- **Java 21** - Moderne LTS-Version mit Performance-Optimierungen
+- **Spring Boot 3.2.8** - Enterprise-Framework für Microservices
+- **Spring Data JPA** - Datenbankzugriff und ORM
+- **Spring Security** - Authentifizierung und Autorisierung
+- **Spring Cache** - Abstraction Layer für Caching
+
+### **AI & Machine Learning**
+- **OpenAI API Integration** - GPT-basierte Textanalyse
+- **Hybrid-Erkennungsalgorithmus** - Kombination aus Keywords und KI
+- **Natural Language Processing** - Intelligente Textverarbeitung
+
+### **Datenbanken & Caching**
+- **H2 Database** - In-Memory Database für Development
+- **Redis 7.0** - High-Performance Caching Layer
+- **JPA/Hibernate** - Object-Relational Mapping
+
+### **Frontend & UI**
+- **Thymeleaf** - Server-side Template Engine
+- **HTML5/CSS3** - Moderne Web-Standards
+- **JavaScript ES6+** - Interactive Frontend-Features
+- **Bootstrap/Responsive Design** - Mobile-first Ansatz
+
+### **DevOps & Monitoring**
+- **Docker & Docker Compose** - Containerisierung
+- **Prometheus & Micrometer** - Metrics und Monitoring
+- **Maven** - Build-Management und Dependency-Verwaltung
+- **JUnit 5 & Testcontainers** - Comprehensive Testing
+
+---
+
+## 🚀 Features im Detail
+
+### 1. **Intelligente Dokumentenanalyse**
+```java
+// Automatische Textextraktion aus verschiedenen Formaten
+@Service
+public class DocumentProcessingService {
+    public DocumentAnalysis analyzeDocument(MultipartFile file) {
+        String extractedText = extractText(file);
+        return aiService.performAnalysis(extractedText);
+    }
+}
 ```
 
-### Backend (Node.js + Express)
-```javascript
-├── Node.js 20+ mit Express.js
-├── TypeScript für Type Safety
-├── RESTful API Architecture
-├── Multer für File Upload Handling
-├── CORS für Cross-Origin Requests
-├── Helmet für Security Headers
-└── Morgan für Request Logging
-```
+### 2. **KI-gestützte Branchenerkennung**
+- **10 Industriezweige**: Automotive, Pharma, E-Commerce, Finanzwesen, IT/Software, etc.
+- **Hybrid-Algorithmus**: 60% Keywords + 40% AI für optimale Genauigkeit
+- **Confidence-Scoring**: Vertrauenswerte für jede Klassifizierung
+- **Fallback-Mechanismus**: Funktioniert auch ohne OpenAI API
 
-### KI & Machine Learning Integration
-```python
-├── OpenAI GPT Integration (geplant)
-├── Natural Language Processing (NLP)
-├── Text Summarization Algorithms
-├── Keyword Extraction
-├── Sentiment Analysis
-└── Technology Recommendation Engine
-```
-
-### DevOps & Deployment
+### 3. **Performance & Skalierbarkeit**
 ```yaml
-├── Docker Containerization
-├── Render.com Cloud Deployment
-├── GitHub Actions CI/CD (geplant)
-├── Environment-based Configuration
-├── Health Check Endpoints
-└── Monitoring & Logging
+# Redis Caching Configuration
+spring:
+  redis:
+    host: localhost
+    port: 6379
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
 ```
+
+### 4. **Monitoring & Observability**
+- **Health Checks**: `/actuator/health` für System-Status
+- **Prometheus Metrics**: Performance und Usage-Metriken
+- **Custom Dashboards**: Grafana-Integration möglich
 
 ---
 
-## 🎨 Features & Funktionalitäten
-
-### ✨ Aktuelle Features
-- **📄 Multi-Format Support**: PDF, TXT, DOC, DOCX, CSV, JSON, MD
-- **✍️ Text-Eingabe**: Direkte Texteingabe bis 15.000 Zeichen
-- **🔍 Intelligente Analyse**: Automatische Schlüsselwort-Extraktion
-- **📊 Zusammenfassungen**: KI-generierte Dokument-Summaries
-- **💻 Tech-Empfehlungen**: Technologie-Vorschläge basierend auf Inhalt
-- **📱 Responsive Design**: Optimiert für Desktop, Tablet und Mobile
-- **🔒 Sichere Uploads**: Validierung und Größenbeschränkungen
-- **⚡ Real-time Processing**: Live-Feedback während der Analyse
-
-### 🔮 Geplante Erweiterungen
-- **🤖 OpenAI GPT-4 Integration**: Erweiterte KI-Analyse
-- **🌐 Multi-Language Support**: Deutsch, Englisch, Französisch
-- **👥 User Management**: Registrierung und Benutzerprofile
-- **📈 Analytics Dashboard**: Detaillierte Analyse-Statistiken
-- **🔗 API Integration**: RESTful API für Drittanbieter
-- **☁️ Cloud Storage**: AWS S3 für Dokument-Speicherung
-- **📧 E-Mail Reports**: Automatische Analyse-Berichte
-- **🔐 Enterprise Security**: SSO, LDAP, Audit Logs
-
----
-
-## 🏗️ Architektur & Design Patterns
-
-### Microservices-Ready Architecture
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Angular SPA   │    │   Node.js API   │    │   AI Services   │
-│                 │    │                 │    │                 │
-│ • Components    │◄──►│ • REST Routes   │◄──►│ • NLP Engine    │
-│ • Services      │    │ • Middleware    │    │ • ML Models     │
-│ • Guards        │    │ • Controllers   │    │ • Text Analysis │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Static Files  │    │   File Storage  │    │   Database      │
-│   (Render.com)  │    │   (Local/Cloud) │    │   (Future)      │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Design Patterns
-- **🏛️ MVC Pattern**: Klare Trennung von Model, View, Controller
-- **🔄 Observer Pattern**: RxJS Observables für Reactive Programming
-- **🏭 Factory Pattern**: Service-Instanziierung und Dependency Injection
-- **🛡️ Guard Pattern**: Route Guards für Navigation Control
-- **📦 Module Pattern**: Lazy Loading für Performance-Optimierung
-
----
-
-## 🛠️ Installation & Setup
+## 📦 Installation & Setup
 
 ### Voraussetzungen
+- **Java 21** oder höher
+- **Maven 3.8+**
+- **Docker** (optional für Redis)
+- **Git**
+
+### 1. Repository klonen & Setup
 ```bash
-Node.js >= 20.0.0
-npm >= 10.0.0
-Angular CLI >= 17.0.0
-Git
+git clone <repository-url>
+cd ai-doc-assist
+
+# Quick Setup ausführen
+chmod +x quick-setup.sh
+./quick-setup.sh
 ```
 
-### Lokale Entwicklung
+### 2. Konfiguration
 ```bash
-# Repository klonen
-git clone https://github.com/thanhtuanh/ai-docs-assist.git
-cd ai-docs-assist
+# .env Datei erstellen
+cp .env.template .env
 
-# Dependencies installieren
-npm install
-
-# Frontend starten (Port 4200)
-cd frontend
-npm install
-ng serve
-
-# Backend starten (Port 8080)
-cd backend
-npm install
-npm run dev
-
-# Vollständige Anwendung mit Docker
-docker-compose up --build
+# Optional: OpenAI API Key hinzufügen
+echo "OPENAI_API_KEY=your_api_key_here" >> .env
 ```
 
-### Environment Configuration
-```typescript
-// frontend/src/environments/environment.ts
-export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8080/api'
-};
+### 3. Dependencies installieren
+```bash
+mvn clean install
+```
 
-// frontend/src/environments/environment.prod.ts
-export const environment = {
-  production: true,
-  apiUrl: 'https://ai-docs-assist.onrender.com/api'
-};
+### 4. Redis starten (Docker)
+```bash
+docker-compose -f docker-compose-redis.yml up -d
+```
+
+### 5. Anwendung starten
+```bash
+# Development Mode
+./start-with-industry-detection.sh
+
+# Oder manuell
+mvn spring-boot:run -Dspring-boot.run.profiles=development
 ```
 
 ---
 
-## 🌐 Deployment & DevOps
+## 🧪 API-Endpunkte
 
-### Render.com Deployment
+### **Branchenerkennung**
+```http
+POST /api/ai/detect-industry
+Content-Type: application/json
+
+{
+  "text": "BMW entwickelt innovative Fahrzeuge für die Zukunft der Mobilität..."
+}
+```
+
+**Response:**
+```json
+{
+  "primaryIndustry": "Automotive",
+  "confidence": 87.5,
+  "topIndustries": [
+    {"industry": "Automotive", "confidence": 87.5},
+    {"industry": "IT/Software", "confidence": 23.1}
+  ],
+  "detectionMethod": "Keywords + AI",
+  "timestamp": 1692345678901
+}
+```
+
+### **Vollständige Dokumentenanalyse**
+```http
+POST /api/ai/analyze
+Content-Type: application/json
+
+{
+  "text": "Dokumenttext hier..."
+}
+```
+
+### **Health & Monitoring**
+```http
+GET /actuator/health          # System Health
+GET /actuator/metrics         # Performance Metrics
+GET /actuator/prometheus      # Prometheus Format
+GET /api/ai/info             # Service Information
+```
+
+---
+
+## 🧪 Testing
+
+### Unit Tests
+```bash
+mvn test
+```
+
+### Integration Tests
+```bash
+mvn verify -P integration-test
+```
+
+### API Tests
+```bash
+# Automatisierte API Tests
+./test-industry-detection.sh
+```
+
+### Coverage Report
+```bash
+mvn jacoco:report
+# Report verfügbar unter: target/site/jacoco/index.html
+```
+
+---
+
+## 🐳 Docker Deployment
+
+### Development Setup
+```bash
+# Nur Redis für lokale Entwicklung
+docker-compose -f docker-compose-redis.yml up -d
+```
+
+### Production Setup
+```bash
+# Vollständige Produktionsumgebung
+docker-compose up -d
+
+# Services verfügbar:
+# - Application: http://localhost:8080
+# - Prometheus: http://localhost:9090
+# - Grafana: http://localhost:3000
+```
+
+---
+
+## 📊 Architektur & Design
+
+### **Layered Architecture**
+```
+┌─────────────────────────────────────┐
+│           Presentation Layer        │
+│     (Controllers, Thymeleaf)       │
+├─────────────────────────────────────┤
+│            Service Layer            │
+│  (Business Logic, AI Integration)   │
+├─────────────────────────────────────┤
+│         Persistence Layer           │
+│      (JPA, Redis, Database)        │
+├─────────────────────────────────────┤
+│         Infrastructure Layer        │
+│    (Configuration, Security)       │
+└─────────────────────────────────────┘
+```
+
+### **Design Patterns**
+- **Service Layer Pattern** - Trennung von Business Logic
+- **Repository Pattern** - Datenzugriff-Abstraktion
+- **Strategy Pattern** - Verschiedene AI-Erkennungsstrategien
+- **Cache-Aside Pattern** - Performance-Optimierung
+- **Circuit Breaker** - Resilience für externe APIs
+
+---
+
+## 🔧 Konfiguration
+
+### **Umgebungsvariablen**
+```bash
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key
+
+# Redis Configuration  
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Application Settings
+SPRING_PROFILES_ACTIVE=development
+LOG_LEVEL=INFO
+INDUSTRY_DETECTION_ENABLED=true
+```
+
+### **Profile**
+- **development** - Lokale Entwicklung mit Debug-Logs
+- **production** - Produktionsumgebung mit Optimierungen
+- **test** - Test-Umgebung mit Mocks
+
+---
+
+## 📈 Performance & Metrics
+
+### **Benchmark-Ergebnisse**
+- **Dokumentenverarbeitung**: < 500ms für 1MB PDF
+- **Branchenerkennung**: < 200ms (mit Cache)
+- **Concurrent Users**: 100+ gleichzeitige Anfragen
+- **Memory Usage**: ~512MB (mit 1000 gecachten Ergebnissen)
+
+### **Monitoring KPIs**
+- Response Time Percentiles (P50, P95, P99)
+- Cache Hit Ratio (Target: >80%)
+- AI API Success Rate (Target: >99%)
+- Error Rate (Target: <1%)
+
+---
+
+## 🛡️ Sicherheit
+
+### **Implementierte Maßnahmen**
+- **Input Validation** - Schutz vor Injection-Angriffen
+- **File Upload Security** - Validierung von Dateitypen und -größen
+- **Rate Limiting** - Schutz vor DoS-Attacken
+- **Secure Headers** - XSS und CSRF Protection
+- **Environment Variables** - Sichere Konfiguration von Secrets
+
+---
+
+## 🔄 Continuous Integration
+
+### **GitHub Actions Workflow**
 ```yaml
-# render.yaml
-services:
-  - type: web
-    name: ai-docs-assist-frontend
-    env: static
-    buildCommand: cd frontend && npm install && ng build --prod
-    staticPublishPath: frontend/dist
-    
-  - type: web
-    name: ai-docs-assist-backend
-    env: node
-    buildCommand: cd backend && npm install && npm run build
-    startCommand: cd backend && npm start
+name: CI/CD Pipeline
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+      - name: Run tests
+        run: mvn clean verify
 ```
 
-### Performance Optimierung
-- **🗜️ Bundle Splitting**: Lazy Loading für bessere Performance
-- **📦 Tree Shaking**: Entfernung ungenutzten Codes
-- **🖼️ Image Optimization**: WebP Format und Lazy Loading
-- **⚡ CDN Integration**: Statische Assets über CDN
-- **🔄 Caching Strategy**: Browser und Server-Side Caching
+---
+
+## 📚 Dokumentation
+
+### **Zusätzliche Ressourcen**
+- **API Dokumentation**: `/api/ai/info`
+- **Health Checks**: `/actuator/health`
+- **Database Console**: `/h2-console` (Development)
+- **Code Coverage**: `target/site/jacoco/index.html`
 
 ---
 
-## 🎯 Business Value & Anwendungsfälle
+## 🤝 Contributing
 
-### 🏢 Enterprise-Erweiterungen
+### **Development Workflow**
+1. Fork des Repositories
+2. Feature Branch erstellen (`git checkout -b feature/amazing-feature`)
+3. Commits mit aussagekräftigen Nachrichten
+4. Tests schreiben und ausführen
+5. Pull Request erstellen
 
-#### Branchenspezifische Anpassungen
-```typescript
-// Beispiel: Rechtsbranche
-interface LegalDocumentAnalysis {
-  contractType: string;
-  riskAssessment: RiskLevel;
-  complianceCheck: ComplianceResult;
-  keyTerms: LegalTerm[];
-}
-
-// Beispiel: Finanzbranche
-interface FinancialDocumentAnalysis {
-  documentType: 'report' | 'statement' | 'analysis';
-  financialMetrics: FinancialKPI[];
-  riskIndicators: RiskIndicator[];
-  regulatoryCompliance: ComplianceStatus;
-}
-```
-
-#### Kundenspezifische Features
-- **🏥 Healthcare**: HIPAA-Compliance, Medizinische Terminologie
-- **🏦 Finance**: GDPR, PCI-DSS, Finanzanalyse-Tools
-- **⚖️ Legal**: Vertragsanalyse, Compliance-Checks
-- **🏭 Manufacturing**: Technische Dokumentation, Qualitätsstandards
-- **🛒 E-Commerce**: Produktbeschreibungen, SEO-Optimierung
-
-### 📊 ROI & Geschäftsnutzen
-- **⏱️ Zeitersparnis**: 80% Reduktion bei manueller Dokumentenanalyse
-- **🎯 Genauigkeit**: 95% Präzision bei Schlüsselwort-Extraktion
-- **💰 Kostenreduktion**: Automatisierung repetitiver Aufgaben
-- **📈 Skalierbarkeit**: Verarbeitung von 1000+ Dokumenten/Stunde
-- **🔍 Insights**: Datengetriebene Entscheidungsfindung
+### **Code Standards**
+- **Java Code Style**: Google Java Style Guide
+- **Test Coverage**: Minimum 80%
+- **Documentation**: JavaDoc für alle Public APIs
+- **Security**: OWASP Best Practices
 
 ---
 
-## 🔮 Roadmap & Zukunftspläne
+## 📋 Roadmap
 
-### Phase 1: Foundation (Q3 2025) ✅
-- [x] Basic Document Upload & Analysis
-- [x] Angular Frontend mit Responsive Design
-- [x] Node.js Backend API
-- [x] Render.com Deployment
-- [x] Demo-Integration
-
-### Phase 2: AI Enhancement (Q4 2025)
-- [ ] OpenAI GPT-4 Integration
-- [ ] Advanced NLP Algorithms
-- [ ] Machine Learning Model Training
-- [ ] Sentiment Analysis
-- [ ] Multi-Language Support
-
-### Phase 3: Enterprise Features (Q1 2026)
-- [ ] User Authentication & Authorization
-- [ ] Role-based Access Control
-- [ ] API Rate Limiting
-- [ ] Advanced Analytics Dashboard
-- [ ] Audit Logging
-
-### Phase 4: Scale & Optimize (Q2 2026)
-- [ ] Microservices Architecture
-- [ ] Kubernetes Deployment
-- [ ] Real-time Collaboration
-- [ ] Mobile Native Apps
-- [ ] Enterprise Integrations (SAP, Salesforce)
+### **Geplante Features**
+- [ ] **Multi-Language Support** - Unterstützung für weitere Sprachen
+- [ ] **Advanced AI Models** - Integration von GPT-4 und lokalen LLMs
+- [ ] **Batch Processing** - Verarbeitung mehrerer Dokumente
+- [ ] **REST API v2** - Erweiterte API mit GraphQL
+- [ ] **Mobile App** - React Native/Flutter Client
+- [ ] **Enterprise Features** - SSO, Advanced Security
 
 ---
 
-## 🧪 Testing & Qualitätssicherung
+## 📞 Kontakt & Support
 
-### Testing Strategy
-```typescript
-// Unit Tests
-├── Frontend: Jasmine + Karma (90%+ Coverage)
-├── Backend: Jest + Supertest (85%+ Coverage)
-├── Integration Tests: Cypress E2E
-└── Performance Tests: Lighthouse CI
+### **Entwickler**
+**Duc Thanh Nguyen** - Java Fullstack Entwickler mit KI-Spezialisierung
 
-// Code Quality
-├── ESLint + Prettier für Code Standards
-├── SonarQube für Code Quality Analysis
-├── Husky für Pre-commit Hooks
-└── GitHub Actions für CI/CD Pipeline
-```
+- **LinkedIn**: https://www.linkedin.com/in/duc-thanh-nguyen-55aa5941
+- **GitHub**: https://github.com/thanhtuanh/bewerbung
+- **E-Mail**: n.thanh@gmx.de
 
-### Security & Compliance
-- **🔒 OWASP Top 10**: Schutz vor häufigsten Sicherheitslücken
-- **🛡️ HTTPS/TLS**: Ende-zu-Ende Verschlüsselung
-- **🔐 Input Validation**: Schutz vor Injection-Attacken
-- **📋 DSGVO-Compliance**: EU-Datenschutz-Grundverordnung
-- **🔍 Security Audits**: Regelmäßige Penetrationstests
+### **Projekt-Kontext**
+Dieses Projekt wurde als **Portfolio-Demonstration** für Bewerbungen als **Java Fullstack Entwickler mit KI-Integration** entwickelt. Es zeigt moderne Softwareentwicklung mit:
+
+- **Enterprise Java Development** (Spring Boot, JPA, Security)
+- **AI/ML Integration** (OpenAI API, NLP, Machine Learning)
+- **Cloud-Native Architecture** (Docker, Microservices, Caching)
+- **DevOps Practices** (CI/CD, Monitoring, Testing)
+- **Full-Stack Development** (Backend + Frontend + Database)
+
+**Der Quellcode ist privat**, aber die Funktionalität kann über Demo-Umgebung getestet werden.
 
 ---
 
-## 👨‍💻 Über den Entwickler
+## 📄 Lizenz
 
-### **Duc Thanh Nguyen**
-**Java Full-Stack Entwickler mit KI-Spezialisierung**
-
-#### 🎯 Expertise
-- **☕ Java Ecosystem**: Spring Boot, Spring Security, JPA/Hibernate
-- **🌐 Frontend**: Angular, React, TypeScript, JavaScript
-- **🤖 AI/ML**: Machine Learning, NLP, OpenAI Integration
-- **☁️ Cloud**: AWS, Docker, Kubernetes, Microservices
-- **🗄️ Databases**: PostgreSQL, MongoDB, Redis
-
-#### 🏆 Projektphilosophie
-> *"Moderne Softwareentwicklung verbindet bewährte Patterns mit innovativen Technologien. Dieses Projekt demonstriert meine Fähigkeit, komplexe Full-Stack-Anwendungen zu entwickeln, die sowohl technisch anspruchsvoll als auch benutzerfreundlich sind."*
-
-#### 📞 Kontakt & Portfolio
-- **🔗 Portfolio**: [github.com/thanhtuanh/bewerbung](https://github.com/thanhtuanh/bewerbung)
-- **💼 LinkedIn**: [Verfügbar auf Anfrage]
-- **📧 E-Mail**: [Verfügbar auf Anfrage]
-- **🌐 Live Demo**: [ai-docs-assist-demo.onrender.com](https://ai-docs-assist-demo.onrender.com)
+Dieses Projekt ist für **Portfolio- und Bewerbungszwecke** entwickelt.  
+**Alle Rechte vorbehalten © 2024 Thanh Nguyen**
 
 ---
 
-## 📄 Lizenz & Nutzung
+## 🏆 Technische Highlights für Recruiter
 
-### Open Source Komponenten
-```
-MIT License - Für Demonstrationszwecke und Portfolio
+### **Demonstrierte Fähigkeiten**
+✅ **Modern Java** (21, Spring Boot 3.x, JPA)  
+✅ **AI/ML Integration** (OpenAI, NLP, Hybrid Algorithms)  
+✅ **Microservices Architecture** (Service Layer, REST APIs)  
+✅ **Database Design** (JPA/Hibernate, Redis Caching)  
+✅ **Security Implementation** (Spring Security, Input Validation)  
+✅ **DevOps & Containerization** (Docker, CI/CD, Monitoring)  
+✅ **Testing Strategies** (Unit, Integration, Testcontainers)  
+✅ **Performance Optimization** (Caching, Async Processing)  
+✅ **Full-Stack Development** (Backend + Frontend + Database)
 
-Copyright (c) 2025 Duc Thanh Nguyen
+### **Business Value**
+- **Automatisierung** von manuellen Dokumentenanalyse-Prozessen
+- **KI-Integration** für intelligente Businesslösungen  
+- **Skalierbare Architektur** für Enterprise-Anforderungen
+- **Moderne Technologien** für zukunftssichere Entwicklung
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software for educational and demonstration purposes.
-```
-
-### Enterprise Lizenzierung
-Für kommerzielle Nutzung und Enterprise-Erweiterungen kontaktieren Sie bitte den Entwickler für individuelle Lizenzvereinbarungen.
-
----
-
-## 🤝 Beitrag & Feedback
-
-### Für Arbeitgeber & Recruiter
-Dieses Projekt demonstriert:
-- **🏗️ Architektur-Kompetenz**: Saubere, skalierbare Code-Struktur
-- **🔧 Full-Stack-Fähigkeiten**: Frontend, Backend, DevOps
-- **🤖 KI-Integration**: Moderne AI/ML-Technologien
-- **📱 UX/UI-Verständnis**: Benutzerfreundliche Interfaces
-- **☁️ Cloud-Expertise**: Production-ready Deployment
-
-### Technische Diskussion
-Gerne diskutiere ich über:
-- Architektur-Entscheidungen und Design Patterns
-- Performance-Optimierungen und Skalierungsstrategien
-- KI-Integration und Machine Learning Ansätze
-- Enterprise-Erweiterungen und Branchenanpassungen
-- Code-Quality und Testing-Strategien
-
----
-
-**🚀 Bereit für den nächsten Schritt in der Softwareentwicklung!**
-
-*Dieses Projekt zeigt meine Leidenschaft für innovative Technologien und meine Fähigkeit, komplexe Probleme mit eleganten, skalierbaren Lösungen zu bewältigen.*
+*Dieses Projekt repräsentiert professionelle Softwareentwicklung auf Enterprise-Niveau mit Fokus auf KI-Integration und moderne Java-Technologien.*

@@ -232,12 +232,12 @@
       <div class="result-section industry-detection">
         <h4>🔍 Erkannte Branche</h4>
         <div class="detected-industry">
-          <span class="industry-name">{{ analysisResult.detectedIndustry.name }}</span>
+          <span class="industry-name">{{ analysisResult.detectedIndustry?.name || 'Unknown' }}</span>
           <span class="confidence-badge" [ngClass]="getConfidenceClass(analysisResult.confidence)">
-            {{ analysisResult.confidence }}% Sicherheit
+            {{ analysisResult.confidence || 0 }}% Sicherheit
           </span>
         </div>
-        <p class="industry-description">{{ analysisResult.detectedIndustry.description }}</p>
+        <p class="industry-description">{{ analysisResult.detectedIndustry?.description || 'No description available' }}</p>
       </div>
 
       <!-- Keywords with Industry Context -->
@@ -245,21 +245,21 @@
         <h4>🔑 Branchenspezifische Schlüsselwörter</h4>
         <div class="keywords-categorized">
           <div class="keyword-category">
-            <strong>💻 Technologien ({{ analysisResult.technologyKeywords.length }}):</strong>
+            <strong>💻 Technologien ({{ (analysisResult.technologyKeywords || []).length }}):</strong>
             <div class="keywords">
-              <span *ngFor="let keyword of analysisResult.technologyKeywords" class="keyword-tag tech">{{ keyword }}</span>
+              <span *ngFor="let keyword of analysisResult.technologyKeywords || []" class="keyword-tag tech">{{ keyword }}</span>
             </div>
           </div>
           <div class="keyword-category">
-            <strong>🏢 Business-Begriffe ({{ analysisResult.businessKeywords.length }}):</strong>
+            <strong>🏢 Business-Begriffe ({{ (analysisResult.businessKeywords || []).length }}):</strong>
             <div class="keywords">
-              <span *ngFor="let keyword of analysisResult.businessKeywords" class="keyword-tag business">{{ keyword }}</span>
+              <span *ngFor="let keyword of analysisResult.businessKeywords || []" class="keyword-tag business">{{ keyword }}</span>
             </div>
           </div>
           <div class="keyword-category">
-            <strong>📋 Compliance ({{ analysisResult.complianceKeywords.length }}):</strong>
+            <strong>📋 Compliance ({{ (analysisResult.complianceKeywords || []).length }}):</strong>
             <div class="keywords">
-              <span *ngFor="let keyword of analysisResult.complianceKeywords" class="keyword-tag compliance">{{ keyword }}</span>
+              <span *ngFor="let keyword of analysisResult.complianceKeywords || []" class="keyword-tag compliance">{{ keyword }}</span>
             </div>
           </div>
         </div>
@@ -268,7 +268,7 @@
       <!-- Enhanced Summary -->
       <div class="result-section">
         <h4>📄 Intelligente Zusammenfassung</h4>
-        <p class="enhanced-summary">{{ analysisResult.summary }}</p>
+        <p class="enhanced-summary">{{ analysisResult.summary || 'Keine Zusammenfassung verfügbar' }}</p>
       </div>
 
       <!-- Industry-Specific Recommendations -->
@@ -276,28 +276,28 @@
         <h4>💡 Priorisierte Empfehlungen</h4>
         <div class="recommendations-categorized">
           <div class="recommendation-category high-priority">
-            <h5>🔴 Hohe Priorität ({{ analysisResult.highPriorityRecommendations.length }})</h5>
+            <h5>🔴 Hohe Priorität ({{ (analysisResult.highPriorityRecommendations || []).length }})</h5>
             <ul>
-              <li *ngFor="let rec of analysisResult.highPriorityRecommendations">{{ rec }}</li>
+              <li *ngFor="let rec of analysisResult.highPriorityRecommendations || []">{{ rec }}</li>
             </ul>
           </div>
           <div class="recommendation-category medium-priority">
-            <h5>🟡 Mittlere Priorität ({{ analysisResult.mediumPriorityRecommendations.length }})</h5>
+            <h5>🟡 Mittlere Priorität ({{ (analysisResult.mediumPriorityRecommendations || []).length }})</h5>
             <ul>
-              <li *ngFor="let rec of analysisResult.mediumPriorityRecommendations">{{ rec }}</li>
+              <li *ngFor="let rec of analysisResult.mediumPriorityRecommendations || []">{{ rec }}</li>
             </ul>
           </div>
           <div class="recommendation-category low-priority">
-            <h5>🟢 Niedrige Priorität ({{ analysisResult.lowPriorityRecommendations.length }})</h5>
+            <h5>🟢 Niedrige Priorität ({{ (analysisResult.lowPriorityRecommendations || []).length }})</h5>
             <ul>
-              <li *ngFor="let rec of analysisResult.lowPriorityRecommendations">{{ rec }}</li>
+              <li *ngFor="let rec of analysisResult.lowPriorityRecommendations || []">{{ rec }}</li>
             </ul>
           </div>
         </div>
       </div>
 
       <!-- Budget & Timeline Estimation -->
-      <div class="result-section budget-timeline">
+      <div *ngIf="analysisResult.estimatedBudget" class="result-section budget-timeline">
         <h4>💰 Budget & Timeline Schätzung</h4>
         <div class="estimation-grid">
           <div class="estimation-item budget">
@@ -318,7 +318,7 @@
             </div>
           </div>
           
-          <div class="estimation-item timeline">
+          <div *ngIf="analysisResult.timeline" class="estimation-item timeline">
             <h5>⏱️ Zeitplan-Schätzung</h5>
             <div class="timeline-duration">
               <span class="timeline-months">{{ analysisResult.timeline.estimated }}</span>
@@ -344,7 +344,7 @@
       </div>
 
       <!-- Compliance Analysis -->
-      <div class="result-section compliance-analysis">
+      <div *ngIf="analysisResult.complianceResults && analysisResult.complianceResults.length > 0" class="result-section compliance-analysis">
         <h4>📋 Compliance-Analyse</h4>
         <div class="compliance-grid">
           <div *ngFor="let compliance of analysisResult.complianceResults" 
@@ -369,7 +369,7 @@
       </div>
 
       <!-- Risk Assessment -->
-      <div class="result-section risk-assessment">
+      <div *ngIf="analysisResult.riskAssessment" class="result-section risk-assessment">
         <h4>⚠️ Risiko-Bewertung</h4>
         <div class="risk-grid">
           <div class="risk-item">
@@ -403,7 +403,7 @@
           </div>
         </div>
         
-        <div *ngIf="analysisResult.riskAssessment.recommendations.length > 0" class="risk-recommendations">
+        <div *ngIf="analysisResult.riskAssessment.recommendations && analysisResult.riskAssessment.recommendations.length > 0" class="risk-recommendations">
           <strong>🔧 Risiko-Minimierung:</strong>
           <ul>
             <li *ngFor="let rec of analysisResult.riskAssessment.recommendations">{{ rec }}</li>
@@ -412,7 +412,7 @@
       </div>
 
       <!-- Technology Stack Recommendations -->
-      <div class="result-section tech-stack">
+      <div *ngIf="analysisResult.recommendedStack" class="result-section tech-stack">
         <h4>🛠️ Empfohlener Technology Stack</h4>
         <div class="tech-stack-grid">
           <div class="tech-category">
@@ -443,7 +443,7 @@
       </div>
 
       <!-- Success Metrics & KPIs -->
-      <div class="result-section success-metrics">
+      <div *ngIf="analysisResult.successMetrics && analysisResult.successMetrics.length > 0" class="result-section success-metrics">
         <h4>📊 Erfolgs-Metriken & KPIs</h4>
         <div class="metrics-grid">
           <div *ngFor="let metric of analysisResult.successMetrics" class="metric-item">

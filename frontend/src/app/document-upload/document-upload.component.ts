@@ -1,14 +1,42 @@
-// src/app/document-upload/document-upload.component.ts
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { AnalysisFeedback, FeedbackService } from '../feedback.service';
-import { EnhancedAnalysisResult, Industry } from '../models/industry.interfaces';
-import { ApiService } from '../services/api.service';
+import { finalize } from 'rxjs/operators';
+import { ApiService, AnalysisOptions } from '../services/api.service';
 import { IndustryService } from '../services/industry.service';
+import { FeedbackService, AnalysisFeedback } from '../feedback.service';
 
-interface TextLimits {
-  free: number;
-  premium: number;
-  enterprise: number;
+interface EnhancedAnalysisResult {
+  // Core fields from backend
+  document?: any;
+  message?: string;
+  metadata?: { [key: string]: any };
+  processingTimeMs?: number;
+  
+  // Industry analysis fields
+  detectedIndustry?: {
+    id: string;
+    name: string;
+    description: string;
+  };
+  confidence?: number;
+  
+  // Categorized analysis
+  summary?: string;
+  technologyKeywords?: string[];
+  businessKeywords?: string[];
+  complianceKeywords?: string[];
+  
+  // Recommendations
+  highPriorityRecommendations?: string[];
+  mediumPriorityRecommendations?: string[];
+  lowPriorityRecommendations?: string[];
+  
+  // Additional analysis
+  estimatedBudget?: any;
+  timeline?: any;
+  recommendedStack?: any;
+  successMetrics?: any[];
+  complianceResults?: any[];
+  riskAssessment?: any;
 }
 
 @Component({
@@ -19,12 +47,10 @@ interface TextLimits {
 export class DocumentUploadComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
-  // File handling properties
+  // File and text handling
   selectedFile: File | null = null;
-  isDragOver: boolean = false;
-
-  // Text input properties
   textInput: string = '';
+  isDragOver: boolean = false;
 
   // Analysis state
   isAnalyzing: boolean = false;
@@ -33,63 +59,342 @@ export class DocumentUploadComponent implements OnInit {
 
   // Industry selection
   selectedIndustry: string = 'auto';
-  industries: Industry[] = [];
+  industries: any[] = [];
 
-  // Feedback properties
+  // Feedback
   showFeedback: boolean = false;
   feedbackRating: number = 0;
   feedbackComment: string = '';
   feedbackSubmitted: boolean = false;
   analysisId: string = '';
 
-  // Text limits configuration
-  textLimits: TextLimits = {
-    free: 100000,      // 100k chars (~40-50 pages)
-    premium: 500000,   // 500k chars (~200-250 pages)
-    enterprise: 2000000 // 2M chars (~800-1000 pages)
+  // Text limits
+  textLimits = {
+    free: 100000,
+    premium: 500000,
+    enterprise: 2000000
+  };
+  currentPlan: 'free' | 'premium' | 'enterprise' = 'free';
+
+  // Analysis options
+  analysisOptions: AnalysisOptions = {
+    generateSummary: true,
+    extractKeywords: true,
+    suggestComponents: true,
+    performSentimentAnalysis: false,
+    detectLanguage: true,
+    calculateMetrics: true
   };
 
-  private currentPlan: 'free' | 'premium' | 'enterprise' = 'free';
-
   constructor(
-    private industryService: IndustryService,
     private apiService: ApiService,
+    private industryService: IndustryService,
     private feedbackService: FeedbackService
-  ) { }
+  ) {}
 
   ngOnInit(): void {
+    this.loadIndustries();
+    this.checkBackendHealth();
+  }
+
+  // =============================================
+  // INITIALIZATION METHODS
+  // =============================================
+
+  private loadIndustries(): void {
     this.industries = this.industryService.getAllIndustries();
+    
+    // Also load from backend if available
+    this.industryService.getSupportedIndustries().subscribe({
+      next: (backendIndustries) => {
+        console.log('✅ Backend industries loaded:', backendIndustries);
+        // Could merge or update local industries here
+      },
+      error: (error) => {
+        console.warn('⚠️ Could not load backend industries, using local ones');
+      }
+    });
   }
 
-  // ===== INDUSTRY SELECTION METHODS =====
+  private checkBackendHealth(): void {
+    this.apiService.checkAiHealth().subscribe({
+      next: (health) => {
+        console.log('✅ AI Service Health:', health);
+      },
+      error: (error) => {
+        console.warn('⚠️ AI Service not available:', error);
+      }
+    });
+  }
 
-  setIndustry(industryId: string): void {
-    this.selectedIndustry = industryId;
+  // =============================================
+  // ANALYSIS METHODS
+  // =============================================
+
+  async analyzeDocument(): Promise<void> {
+    if (!this.selectedFile || this.isAnalyzing) return;
+    
+    this.isAnalyzing = true;
     this.clearResults();
+    console.log('📄 Starting document analysis...');
+
+    // Enhanced analysis options
+    const options: AnalysisOptions = {
+      ...this.analysisOptions,
+      performSentimentAnalysis: true,
+      calculateMetrics: true
+    };
+
+    this.apiService.analyzeDocument(this.selectedFile, options)
+      .pipe(finalize(() => this.isAnalyzing = false))
+      .subscribe({
+        next: (result) => {
+          console.log('✅ Document analysis completed:', result);
+          this.handleAnalysisSuccess(result);
+        },
+        error: (error) => {
+          console.error('❌ Document analysis failed:', error);
+          this.handleAnalysisError(error);
+        }
+      });
   }
 
-  getIndustryName(industryId: string): string {
-    if (industryId === 'auto') return 'Automatische Erkennung';
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.name : 'Unbekannte Branche';
+  async analyzeText(): Promise<void> {
+    if (!this.textInput.trim() || this.isAnalyzing || this.isTextTooLong()) return;
+    
+    this.isAnalyzing = true;
+    this.clearResults();
+    console.log('📝 Starting text analysis...');
+
+    const request = {
+      text: this.textInput,
+      title: this.selectedIndustry === 'auto' ? 'Text Analysis' : `${this.getIndustryName(this.selectedIndustry)} Analysis`,
+      saveDocument: true,
+      options: {
+        ...this.analysisOptions,
+        performSentimentAnalysis: true,
+        calculateMetrics: true
+      }
+    };
+
+    this.apiService.analyzeText(request)
+      .pipe(finalize(() => this.isAnalyzing = false))
+      .subscribe({
+        next: (result) => {
+          console.log('✅ Text analysis completed:', result);
+          this.handleAnalysisSuccess(result);
+        },
+        error: (error) => {
+          console.error('❌ Text analysis failed:', error);
+          this.handleAnalysisError(error);
+        }
+      });
   }
 
-  getIndustryFocusAreas(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.focusAreas : [];
+  // Enhanced analysis with industry detection
+  analyzeWithIndustryDetection(): void {
+    if (!this.textInput.trim() || this.isAnalyzing) return;
+    
+    this.isAnalyzing = true;
+    this.clearResults();
+    console.log('🏭 Starting analysis with industry detection...');
+
+    // First detect industry
+    this.apiService.detectIndustry(this.textInput)
+      .pipe(finalize(() => this.isAnalyzing = false))
+      .subscribe({
+        next: (industryResult) => {
+          console.log('🏭 Industry detected:', industryResult);
+          
+          // Then perform comprehensive analysis
+          this.apiService.comprehensiveAnalysis(this.textInput).subscribe({
+            next: (analysisResult) => {
+              // Combine results
+              const combined = {
+                ...analysisResult,
+                detectedIndustry: {
+                  id: industryResult.primaryIndustry.toLowerCase(),
+                  name: industryResult.primaryIndustry,
+                  description: `Auto-detected: ${industryResult.primaryIndustry}`
+                },
+                confidence: industryResult.confidence
+              };
+              this.handleAnalysisSuccess(combined);
+            },
+            error: (error) => this.handleAnalysisError(error)
+          });
+        },
+        error: (error) => {
+          console.warn('Industry detection failed, using regular analysis');
+          this.analyzeText();
+        }
+      });
   }
 
-  getIndustryRegulations(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.regulations : [];
+  // =============================================
+  // RESULT HANDLING
+  // =============================================
+
+  private handleAnalysisSuccess(result: any): void {
+    console.log('🎉 Analysis successful:', result);
+    
+    // Normalize the result structure
+    this.analysisResult = this.normalizeAnalysisResult(result);
+    
+    // Update selected industry if auto-detected
+    if (this.selectedIndustry === 'auto' && this.analysisResult?.detectedIndustry) {
+      this.selectedIndustry = this.analysisResult.detectedIndustry.id;
+    }
+    
+    // Show feedback option
+    this.analysisId = this.generateAnalysisId();
+    this.showFeedback = true;
+    this.feedbackSubmitted = false;
+    
+    console.log('✅ Analysis result processed and ready for display');
   }
 
-  getIndustryKPIs(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.kpis : [];
+  private handleAnalysisError(error: any): void {
+    console.error('💥 Analysis error:', error);
+    this.errorMessage = error.message || 'Ein Fehler ist bei der Analyse aufgetreten';
+    this.analysisResult = null;
   }
 
-  // ===== FILE HANDLING METHODS =====
+  private normalizeAnalysisResult(result: any): EnhancedAnalysisResult {
+    console.log('📄 Normalizing analysis result...');
+    console.log('🔍 Raw backend result:', result);
+    
+    // Handle different response structures from different endpoints
+    let normalized: EnhancedAnalysisResult = {};
+    
+    // From /api/documents endpoints
+    if (result.document) {
+      const doc = result.document;
+      normalized = {
+        document: doc,
+        message: result.message,
+        metadata: result.metadata,
+        processingTimeMs: result.processingTimeMs,
+        summary: doc.summary,
+        detectedIndustry: {
+          id: doc.documentType?.toLowerCase() || 'ecommerce',
+          name: doc.documentType || 'E-Commerce',
+          description: doc.documentType || 'Document type not specified'
+        },
+        confidence: doc.qualityScore || 50
+      };
+      
+      // Parse keywords if they're comma-separated strings
+      if (doc.keywords) {
+        const keywords = doc.keywords.split(',').map((k: string) => k.trim());
+        normalized.technologyKeywords = keywords.filter((k: string) => this.isTechnicalTerm(k));
+        normalized.businessKeywords = keywords.filter((k: string) => !this.isTechnicalTerm(k));
+        normalized.complianceKeywords = [];
+      }
+      
+      // Parse recommendations
+      if (doc.recommendations) {
+        const recs = doc.recommendations.split('\n').filter((r: string) => r.trim());
+        normalized.highPriorityRecommendations = recs.slice(0, 3);
+        normalized.mediumPriorityRecommendations = recs.slice(3, 6);
+        normalized.lowPriorityRecommendations = recs.slice(6);
+      }
+    }
+    
+    // From /api/ai endpoints
+    if (result.industryAnalysis) {
+      const industry = result.industryAnalysis;
+      normalized.detectedIndustry = {
+        id: industry.primaryIndustry?.toLowerCase() || 'unknown',
+        name: industry.primaryIndustry || 'Unknown',
+        description: `Detected with ${industry.confidence}% confidence`
+      };
+      normalized.confidence = industry.confidence;
+    }
+    
+    // From industry service local analysis
+    if (result.detectedIndustry && !normalized.detectedIndustry) {
+      normalized.detectedIndustry = result.detectedIndustry;
+      normalized.confidence = result.confidence;
+      normalized.summary = result.summary;
+      normalized.technologyKeywords = result.technologyKeywords || [];
+      normalized.businessKeywords = result.businessKeywords || [];
+      normalized.complianceKeywords = result.complianceKeywords || [];
+      normalized.highPriorityRecommendations = result.highPriorityRecommendations || [];
+      normalized.mediumPriorityRecommendations = result.mediumPriorityRecommendations || [];
+      normalized.lowPriorityRecommendations = result.lowPriorityRecommendations || [];
+      normalized.estimatedBudget = result.estimatedBudget;
+      normalized.timeline = result.timeline;
+      normalized.recommendedStack = result.recommendedStack;
+      normalized.successMetrics = result.successMetrics || [];
+      normalized.complianceResults = result.complianceResults || [];
+      normalized.riskAssessment = result.riskAssessment;
+    }
+    
+    // 🆕 Fallback to local analysis if backend gives minimal data
+    if (!normalized.summary || (!normalized.technologyKeywords || normalized.technologyKeywords.length === 0)) {
+      console.log('🔄 Backend analysis incomplete, using local fallback analysis...');
+      const localAnalysis = this.performLocalAnalysis(this.textInput);
+      
+      // Use backend summary if available, otherwise local
+      if (!normalized.summary) {
+        normalized.summary = localAnalysis.summary;
+      }
+      
+      // Use local keyword extraction if backend didn't provide any
+      if (!normalized.technologyKeywords || normalized.technologyKeywords.length === 0) {
+        normalized.technologyKeywords = localAnalysis.technologyKeywords;
+        normalized.businessKeywords = localAnalysis.businessKeywords;
+        normalized.complianceKeywords = localAnalysis.complianceKeywords;
+      }
+      
+      // Use local recommendations if none provided
+      if (!normalized.highPriorityRecommendations || normalized.highPriorityRecommendations.length === 0) {
+        normalized.highPriorityRecommendations = localAnalysis.highPriorityRecommendations;
+        normalized.mediumPriorityRecommendations = localAnalysis.mediumPriorityRecommendations;
+        normalized.lowPriorityRecommendations = localAnalysis.lowPriorityRecommendations;
+      }
+      
+      // Set estimated budget and timeline
+      normalized.estimatedBudget = localAnalysis.estimatedBudget;
+      normalized.timeline = localAnalysis.timeline;
+      normalized.recommendedStack = localAnalysis.recommendedStack;
+      normalized.successMetrics = localAnalysis.successMetrics;
+      normalized.complianceResults = localAnalysis.complianceResults;
+      normalized.riskAssessment = localAnalysis.riskAssessment;
+    }
+    
+    // Fallback for minimal results
+    if (!normalized.detectedIndustry) {
+      // Try to detect industry from text
+      const detectedIndustry = this.detectIndustryFromText(this.textInput);
+      normalized.detectedIndustry = {
+        id: detectedIndustry.id,
+        name: detectedIndustry.name,
+        description: detectedIndustry.description
+      };
+      normalized.confidence = detectedIndustry.confidence;
+    }
+    
+    // Ensure arrays are initialized
+    if (!normalized.technologyKeywords) normalized.technologyKeywords = [];
+    if (!normalized.businessKeywords) normalized.businessKeywords = [];
+    if (!normalized.complianceKeywords) normalized.complianceKeywords = [];
+    if (!normalized.highPriorityRecommendations) normalized.highPriorityRecommendations = [];
+    if (!normalized.mediumPriorityRecommendations) normalized.mediumPriorityRecommendations = [];
+    if (!normalized.lowPriorityRecommendations) normalized.lowPriorityRecommendations = [];
+    
+    if (!normalized.summary && result.textAnalysis) {
+      normalized.summary = result.textAnalysis.summary || 'Analysis completed successfully';
+    }
+    
+    console.log('✅ Analysis result normalized:', normalized);
+    return normalized;
+  }
+
+  // =============================================
+  // FILE HANDLING METHODS
+  // =============================================
 
   onFileAreaClick(): void {
     this.fileInput.nativeElement.click();
@@ -118,7 +423,7 @@ export class DocumentUploadComponent implements OnInit {
   onFileDrop(event: DragEvent): void {
     event.preventDefault();
     this.isDragOver = false;
-
+    
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
       this.selectedFile = files[0];
@@ -133,31 +438,32 @@ export class DocumentUploadComponent implements OnInit {
     this.clearResults();
   }
 
-  validateFile(): void {
+  private validateFile(): void {
     if (!this.selectedFile) return;
-
+    
     const allowedTypes = [
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
       'text/csv',
-      'application/json'
+      'application/json',
+      'text/markdown'
     ];
-
+    
     if (!allowedTypes.includes(this.selectedFile.type)) {
-      this.errorMessage = 'Unsupported file type. Please upload PDF, DOC, DOCX, TXT, CSV, or JSON files.';
+      this.errorMessage = 'Unsupported file type. Supported: PDF, DOC, DOCX, TXT, CSV, JSON, MD';
       this.removeFile();
       return;
     }
-
+    
     const maxSize = 10 * 1024 * 1024; // 10MB
     if (this.selectedFile.size > maxSize) {
-      this.errorMessage = 'File size too large. Maximum size is 10MB.';
+      this.errorMessage = 'File too large. Maximum size is 10MB.';
       this.removeFile();
       return;
     }
-
+    
     this.errorMessage = '';
   }
 
@@ -168,17 +474,49 @@ export class DocumentUploadComponent implements OnInit {
     return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
   }
 
-  // ===== TEXT INPUT METHODS =====
+  // =============================================
+  // INDUSTRY METHODS
+  // =============================================
+
+  setIndustry(industryId: string): void {
+    this.selectedIndustry = industryId;
+    this.clearResults();
+    console.log('🏭 Industry selected:', industryId);
+  }
+
+  getIndustryName(industryId: string): string {
+    if (industryId === 'auto') return 'Automatische Erkennung';
+    const industry = this.industryService.getIndustryById(industryId);
+    return industry ? industry.name : 'Unknown Industry';
+  }
+
+  getIndustryFocusAreas(industryId: string): string[] {
+    const industry = this.industryService.getIndustryById(industryId);
+    return industry ? industry.focusAreas : [];
+  }
+
+  getIndustryRegulations(industryId: string): string[] {
+    const industry = this.industryService.getIndustryById(industryId);
+    return industry ? industry.regulations : [];
+  }
+
+  getIndustryKPIs(industryId: string): string[] {
+    const industry = this.industryService.getIndustryById(industryId);
+    return industry ? industry.kpis : [];
+  }
+
+  // =============================================
+  // TEXT INPUT METHODS
+  // =============================================
 
   loadDemoText(industryType?: string): void {
     const demoType = industryType || 'ecommerce';
     this.textInput = this.getDemoTextByIndustry(demoType);
-
-    // Auto-select the corresponding industry
+    
     if (industryType) {
       this.selectedIndustry = industryType;
     }
-
+    
     this.clearResults();
   }
 
@@ -189,11 +527,9 @@ export class DocumentUploadComponent implements OnInit {
       'fintech': this.getFintechDemoText(),
       'manufacturing': this.getManufacturingDemoText()
     };
-
+    
     return demoTexts[industryType] || demoTexts['ecommerce'];
   }
-
-  // ===== TEXT LIMIT METHODS =====
 
   getTextLimit(): number {
     return this.textLimits[this.currentPlan];
@@ -203,103 +539,13 @@ export class DocumentUploadComponent implements OnInit {
     return this.textInput.length > this.getTextLimit();
   }
 
-  // ===== ANALYSIS METHODS =====
-
-  async analyzeDocument(): Promise<void> {
-    if (!this.selectedFile || this.isAnalyzing) return;
-    this.isAnalyzing = true;
-    this.clearResults();
-
-    this.apiService
-      .analyzeDocument(
-        this.selectedFile,
-        this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
-      )
-      .subscribe({
-        next: (result) => {
-          this.analysisResult = this.normalizeAnalysisResult(result);
-          this.handleAnalysisComplete();
-        },
-        error: () => {
-          // Fallback für Demo
-          this.fallbackToLocalAnalysis('document');
-        }
-      });
+  formatNumber(num: number): string {
+    return new Intl.NumberFormat('de-DE').format(num);
   }
 
-  async analyzeText(): Promise<void> {
-    if (!this.textInput.trim() || this.isAnalyzing) return;
-    this.isAnalyzing = true;
-    this.clearResults();
-
-    this.apiService
-      .analyzeText(
-        this.textInput,
-        this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
-      )
-      .subscribe({
-        next: (result) => {
-          this.analysisResult = this.normalizeAnalysisResult(result);
-          this.handleAnalysisComplete();
-        },
-        error: () => {
-          // Fallback für Demo
-          this.fallbackToLocalAnalysis('text');
-        }
-      });
-  }
-
-  private async fallbackToLocalAnalysis(type: 'document' | 'text'): Promise<void> {
-    try {
-      // Simulate API delay for demo purposes
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      let textToAnalyze = '';
-      if (type === 'document' && this.selectedFile) {
-        textToAnalyze = await this.readFileContent(this.selectedFile);
-      } else {
-        textToAnalyze = this.textInput;
-      }
-
-      // Perform local industry-specific analysis
-      this.analysisResult = this.industryService.analyzeText(
-        textToAnalyze,
-        this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
-      );
-
-      this.handleAnalysisComplete();
-
-    } catch (error) {
-      this.errorMessage = 'Error in local analysis. Please try again.';
-      console.error('Local analysis error:', error);
-    } finally {
-      this.isAnalyzing = false;
-    }
-  }
-
-  private handleAnalysisComplete(): void {
-    // Update selected industry if auto-detected
-    if (this.selectedIndustry === 'auto' && this.analysisResult) {
-      this.selectedIndustry = this.analysisResult.detectedIndustry.id;
-    }
-
-    // Generate unique analysis ID and show feedback option
-    this.analysisId = this.generateAnalysisId();
-    this.showFeedback = true;
-    this.feedbackSubmitted = false;
-    this.isAnalyzing = false;
-  }
-
-  private async readFileContent(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  }
-
-  // ===== FEEDBACK METHODS =====
+  // =============================================
+  // FEEDBACK METHODS
+  // =============================================
 
   setFeedbackRating(rating: number): void {
     this.feedbackRating = rating;
@@ -307,35 +553,26 @@ export class DocumentUploadComponent implements OnInit {
 
   async submitFeedback(): Promise<void> {
     if (this.feedbackRating === 0) {
-      alert('Bitte geben Sie eine Bewertung ab.');
+      alert('Please provide a rating.');
       return;
     }
-
-    // Create feedback data with ONLY the documentId property that exists in AnalysisFeedback
+    
     const feedbackData: AnalysisFeedback = {
       documentId: parseInt(this.analysisId.split('_')[1]) || Math.floor(Math.random() * 1000)
     };
-
+    
     try {
       await this.feedbackService.submitFeedback(feedbackData);
-
-      // Store our detailed feedback separately in localStorage
       this.storeFeedbackDetails();
-
       this.feedbackSubmitted = true;
-
-      // Show success message
       setTimeout(() => {
-        alert('Vielen Dank für Ihr Feedback! Es hilft uns, die Analyse zu verbessern.');
+        alert('Thank you for your feedback!');
       }, 100);
-
     } catch (error) {
       console.error('Error submitting feedback:', error);
-
-      // Fallback: store locally
       this.storeFeedbackDetails();
       this.feedbackSubmitted = true;
-      alert('Feedback wurde lokal gespeichert. Vielen Dank für Ihre Bewertung!');
+      alert('Feedback stored locally. Thank you!');
     }
   }
 
@@ -343,120 +580,26 @@ export class DocumentUploadComponent implements OnInit {
     try {
       const feedbackDetails = {
         analysisId: this.analysisId,
-        documentId: parseInt(this.analysisId.split('_')[1]) || Math.floor(Math.random() * 1000),
         rating: this.feedbackRating,
         comment: this.feedbackComment.trim(),
         industry: this.selectedIndustry,
         timestamp: new Date().toISOString(),
         analysisType: this.selectedFile ? 'document' : 'text'
       };
-
+      
       const existingFeedbacks = JSON.parse(localStorage.getItem('analysis_feedbacks') || '[]');
       existingFeedbacks.push(feedbackDetails);
-
-      // Keep only last 50 feedbacks
+      
       if (existingFeedbacks.length > 50) {
         existingFeedbacks.splice(0, existingFeedbacks.length - 50);
       }
-
+      
       localStorage.setItem('analysis_feedbacks', JSON.stringify(existingFeedbacks));
-
-      console.log('Feedback details stored locally:', feedbackDetails);
+      console.log('Feedback stored locally:', feedbackDetails);
     } catch (error) {
-      console.error('Error storing feedback details:', error);
+      console.error('Error storing feedback:', error);
     }
   }
-
-  private normalizeAnalysisResult(resp: any): EnhancedAnalysisResult {
-    // mögliche Quellen in der Antwort
-    const doc = resp?.document ?? {};
-    // manche Backends legen das Ergebnis unter document.analysis/result/data ab
-    const core =
-      doc.analysis ?? doc.result ?? doc.data ?? resp?.analysis ?? resp?.data ?? {};
-
-    const md = resp?.metadata ?? {};
-    const fallbackId = this.selectedIndustry || 'auto';
-    const fallbackName = this.getIndustryName(fallbackId);
-
-    // detectedIndustry kann String ODER Objekt sein
-    const diRaw =
-      core.detectedIndustry ?? md.detectedIndustry ?? core.industry ?? md.industry;
-
-    let detectedIndustry:
-      | { id: string; name: string; description?: string }
-      | null = null;
-
-    if (typeof diRaw === 'string') {
-      detectedIndustry = { id: diRaw, name: this.getIndustryName(diRaw), description: '' };
-    } else if (diRaw && (diRaw.id || diRaw.name)) {
-      detectedIndustry = {
-        id: diRaw.id ?? fallbackId,
-        name: diRaw.name ?? this.getIndustryName(diRaw.id ?? fallbackId),
-        description: diRaw.description ?? ''
-      };
-    } else {
-      detectedIndustry = { id: fallbackId, name: fallbackName, description: '' };
-    }
-
-    // Keywords aus verschiedenen möglichen Stellen einsammeln
-    const kw =
-      core.keywords ?? md.keywords ?? doc.keywords ?? {
-        technology: core.technologyKeywords ?? [],
-        business: core.businessKeywords ?? [],
-        compliance: core.complianceKeywords ?? []
-      };
-
-    const technologyKeywords = kw.technology ?? core.technologyKeywords ?? [];
-    const businessKeywords = kw.business ?? core.businessKeywords ?? [];
-    const complianceKeywords = kw.compliance ?? core.complianceKeywords ?? [];
-
-    const recommendations =
-      core.recommendations ?? md.recommendations ?? {
-        high: core.highPriorityRecommendations ?? [],
-        medium: core.mediumPriorityRecommendations ?? [],
-        low: core.lowPriorityRecommendations ?? []
-      };
-
-    const estimatedBudget =
-      core.estimatedBudget ?? md.estimatedBudget ?? { min: 0, max: 0, confidence: 'n/a', factors: [] };
-
-    const timeline =
-      core.timeline ?? md.timeline ?? { estimated: 0, phases: [], criticalPath: [] };
-
-    const riskAssessment =
-      core.riskAssessment ?? md.riskAssessment ?? {
-        overall: 0, security: 0, compliance: 0, technical: 0, recommendations: []
-      };
-
-    const recommendedStack =
-      core.recommendedStack ?? md.recommendedStack ?? {
-        frontend: [], backend: [], database: [], infrastructure: []
-      };
-
-    const summary =
-      core.summary ?? md.summary ?? doc.summary ?? '';
-
-    const confidence =
-      core.confidence ?? md.confidence ?? 50;
-
-    return {
-      summary,
-      detectedIndustry,
-      confidence,
-      technologyKeywords,
-      businessKeywords,
-      complianceKeywords,
-      highPriorityRecommendations: recommendations.high ?? [],
-      mediumPriorityRecommendations: recommendations.medium ?? [],
-      lowPriorityRecommendations: recommendations.low ?? [],
-      estimatedBudget,
-      timeline,
-      riskAssessment,
-      recommendedStack,
-      successMetrics: core.successMetrics ?? md.successMetrics ?? []
-    } as unknown as EnhancedAnalysisResult;
-  }
-
 
   resetFeedback(): void {
     this.feedbackRating = 0;
@@ -469,29 +612,19 @@ export class DocumentUploadComponent implements OnInit {
     this.resetFeedback();
   }
 
-  private generateAnalysisId(): string {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
-    return `analysis_${timestamp}_${random}`;
-  }
-
-  // Helper method to get star rating array
   getStars(): number[] {
     return [1, 2, 3, 4, 5];
   }
 
-  // ===== UI HELPER METHODS =====
+  // =============================================
+  // UI HELPER METHODS
+  // =============================================
 
-  getConfidenceClass(confidence: number): string {
+  getConfidenceClass(confidence: number | undefined): string {
+    if (!confidence) return 'low';
     if (confidence >= 70) return 'high';
     if (confidence >= 40) return 'medium';
     return 'low';
-  }
-
-  getRiskColor(riskLevel: number): string {
-    if (riskLevel <= 3) return '#28a745'; // Green
-    if (riskLevel <= 6) return '#ffc107'; // Yellow
-    return '#dc3545'; // Red
   }
 
   getRiskLabel(riskLevel: number): string {
@@ -509,127 +642,80 @@ export class DocumentUploadComponent implements OnInit {
     }).format(amount);
   }
 
-  formatNumber(num: number): string {
-    return new Intl.NumberFormat('de-DE').format(num);
-  }
-
-  // ===== EXPORT METHODS =====
+  // =============================================
+  // EXPORT METHODS
+  // =============================================
 
   exportToPDF(): void {
     if (!this.analysisResult) return;
-
+    
     const content = this.generateReportContent();
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-
+    
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-report-${Date.now()}.txt`;
     link.click();
-
+    
     URL.revokeObjectURL(url);
   }
 
   exportToExcel(): void {
     if (!this.analysisResult) return;
-
+    
     const csvContent = this.generateCSVContent();
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-
+    
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-data-${Date.now()}.csv`;
     link.click();
-
+    
     URL.revokeObjectURL(url);
   }
 
   exportToJSON(): void {
     if (!this.analysisResult) return;
-
+    
     const dataStr = JSON.stringify(this.analysisResult, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
-
+    
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-result-${Date.now()}.json`;
     link.click();
-
+    
     URL.revokeObjectURL(url);
   }
 
   shareResults(): void {
     if (!this.analysisResult) return;
-
+    
     const shareData = {
       title: 'AI Document Analysis Results',
-      text: `Branche: ${this.analysisResult.detectedIndustry.name}\nSicherheit: ${this.analysisResult.confidence}%\nBudget: ${this.formatCurrency(this.analysisResult.estimatedBudget.min)} - ${this.formatCurrency(this.analysisResult.estimatedBudget.max)}`,
+      text: `Industry: ${this.analysisResult.detectedIndustry?.name || 'Unknown'}\nConfidence: ${this.analysisResult.confidence || 0}%`,
       url: window.location.href
     };
-
+    
     if (navigator.share) {
       navigator.share(shareData).catch(console.error);
     } else {
       navigator.clipboard.writeText(
         `${shareData.title}\n\n${shareData.text}\n\n${shareData.url}`
       ).then(() => {
-        alert('Ergebnisse in die Zwischenablage kopiert!');
+        alert('Results copied to clipboard!');
       }).catch(() => {
-        alert('Teilen nicht verfügbar. Bitte kopieren Sie die URL manuell.');
+        alert('Sharing not available. Please copy URL manually.');
       });
     }
   }
 
-  private generateReportContent(): string {
-    if (!this.analysisResult) return '';
-
-    return `AI DOCUMENT ANALYSIS REPORT
-===========================
-
-Erkannte Branche: ${this.analysisResult.detectedIndustry.name}
-Sicherheit: ${this.analysisResult.confidence}%
-Analyse-Datum: ${new Date().toLocaleDateString('de-DE')}
-
-ZUSAMMENFASSUNG
-===============
-${this.analysisResult.summary}
-
-SCHLÜSSELWÖRTER
-===============
-Technologie: ${this.analysisResult.technologyKeywords.join(', ')}
-Business: ${this.analysisResult.businessKeywords.join(', ')}
-Compliance: ${this.analysisResult.complianceKeywords.join(', ')}
-
-EMPFEHLUNGEN (HOHE PRIORITÄT)
-=============================
-${this.analysisResult.highPriorityRecommendations.map((rec, i) => `${i + 1}. ${rec}`).join('\n')}
-
-BUDGET-SCHÄTZUNG
-================
-Minimum: ${this.formatCurrency(this.analysisResult.estimatedBudget.min)}
-Maximum: ${this.formatCurrency(this.analysisResult.estimatedBudget.max)}
-
-TIMELINE: ${this.analysisResult.timeline.estimated} Monate`;
-  }
-
-  private generateCSVContent(): string {
-    if (!this.analysisResult) return '';
-
-    const rows = [
-      ['Kategorie', 'Wert'],
-      ['Branche', this.analysisResult.detectedIndustry.name],
-      ['Konfidenz', `${this.analysisResult.confidence}%`],
-      ['Budget Min', this.formatCurrency(this.analysisResult.estimatedBudget.min)],
-      ['Budget Max', this.formatCurrency(this.analysisResult.estimatedBudget.max)],
-      ['Timeline', `${this.analysisResult.timeline.estimated} Monate`]
-    ];
-
-    return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-  }
-
-  // ===== UTILITY METHODS =====
+  // =============================================
+  // UTILITY METHODS
+  // =============================================
 
   private clearResults(): void {
     this.analysisResult = null;
@@ -638,394 +724,565 @@ TIMELINE: ${this.analysisResult.timeline.estimated} Monate`;
     this.resetFeedback();
   }
 
-  // ===== DEMO TEXT METHODS (Shortened for brevity) =====
+  private generateAnalysisId(): string {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    return `analysis_${timestamp}_${random}`;
+  }
+
+  private isTechnicalTerm(term: string): boolean {
+    const techTerms = [
+      'React', 'Vue', 'Angular', 'Node.js', 'Express', 'TypeScript', 'JavaScript',
+      'API', 'REST', 'GraphQL', 'JSON', 'Database', 'PostgreSQL', 'MongoDB', 'Redis',
+      'Framework', 'Algorithm', 'Software', 'System', 'Code', 'Development',
+      'PWA', 'SPA', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Cloud', 'Microservices',
+      'CI/CD', 'DevOps', 'Terraform', 'Elasticsearch', 'CDN', 'SSL', 'HTTPS',
+      'Payment', 'Integration', 'Caching', 'Performance', 'Security', 'Authentication'
+    ];
+    return techTerms.some(t => term.toLowerCase().includes(t.toLowerCase()));
+  }
+
+  // 🆕 Local analysis fallback when backend provides minimal data
+  private performLocalAnalysis(text: string): any {
+    const technologyKeywords = this.extractTechnologyKeywords(text);
+    const businessKeywords = this.extractBusinessKeywords(text);
+    const complianceKeywords = this.extractComplianceKeywords(text);
+    
+    return {
+      summary: this.generateLocalSummary(text),
+      technologyKeywords,
+      businessKeywords, 
+      complianceKeywords,
+      highPriorityRecommendations: this.generateHighPriorityRecommendations(text),
+      mediumPriorityRecommendations: this.generateMediumPriorityRecommendations(text),
+      lowPriorityRecommendations: this.generateLowPriorityRecommendations(text),
+      estimatedBudget: this.estimateBudgetFromText(text),
+      timeline: this.estimateTimelineFromText(text),
+      recommendedStack: this.recommendTechStackFromText(text),
+      successMetrics: this.generateSuccessMetrics(text),
+      complianceResults: this.analyzeComplianceFromText(text),
+      riskAssessment: this.assessRiskFromText(text)
+    };
+  }
+
+  private detectIndustryFromText(text: string): any {
+    const lowerText = text.toLowerCase();
+    
+    // E-Commerce indicators
+    if (lowerText.includes('e-commerce') || lowerText.includes('shop') || 
+        lowerText.includes('payment') || lowerText.includes('checkout') ||
+        lowerText.includes('conversion') || lowerText.includes('fashion')) {
+      return {
+        id: 'ecommerce',
+        name: 'E-Commerce & Retail',
+        description: 'Detected based on e-commerce, shopping, and retail keywords',
+        confidence: 75
+      };
+    }
+    
+    // Healthcare indicators
+    if (lowerText.includes('health') || lowerText.includes('medical') || 
+        lowerText.includes('patient') || lowerText.includes('hospital') ||
+        lowerText.includes('fhir') || lowerText.includes('hipaa')) {
+      return {
+        id: 'healthcare',
+        name: 'Healthcare',
+        description: 'Detected based on healthcare and medical keywords',
+        confidence: 80
+      };
+    }
+    
+    // Fintech indicators  
+    if (lowerText.includes('fintech') || lowerText.includes('banking') ||
+        lowerText.includes('payment') || lowerText.includes('financial') ||
+        lowerText.includes('pci-dss') || lowerText.includes('fraud')) {
+      return {
+        id: 'fintech',
+        name: 'Fintech & Banking',
+        description: 'Detected based on financial and payment keywords',
+        confidence: 85
+      };
+    }
+    
+    // Manufacturing indicators
+    if (lowerText.includes('manufacturing') || lowerText.includes('iot') ||
+        lowerText.includes('industry 4.0') || lowerText.includes('factory') ||
+        lowerText.includes('production') || lowerText.includes('automation')) {
+      return {
+        id: 'manufacturing',
+        name: 'Manufacturing & Industry 4.0',
+        description: 'Detected based on manufacturing and IoT keywords',
+        confidence: 78
+      };
+    }
+    
+    // Default to IT
+    return {
+      id: 'it',
+      name: 'IT & Software',
+      description: 'Default classification for technology projects',
+      confidence: 50
+    };
+  }
+
+  private extractTechnologyKeywords(text: string): string[] {
+    const techTerms = [
+      'React', 'Vue.js', 'Angular', 'Node.js', 'Express', 'TypeScript', 'JavaScript',
+      'PWA', 'SPA', 'GraphQL', 'REST API', 'Microservices', 'Docker', 'Kubernetes',
+      'PostgreSQL', 'MongoDB', 'Redis', 'Elasticsearch', 'AWS', 'Azure', 'CloudFront',
+      'CI/CD', 'DevOps', 'Terraform', 'PayPal', 'Stripe', 'CDN', 'SSL', 'HTTPS'
+    ];
+    
+    const found: string[] = [];
+    const lowerText = text.toLowerCase();
+    
+    techTerms.forEach(term => {
+      if (lowerText.includes(term.toLowerCase())) {
+        found.push(term);
+      }
+    });
+    
+    return found.slice(0, 10); // Limit to top 10
+  }
+
+  private extractBusinessKeywords(text: string): string[] {
+    const businessTerms = [
+      'E-Commerce', 'Conversion Rate', 'Mobile Commerce', 'Customer Experience',
+      'ROI', 'Revenue', 'Sales', 'Marketing', 'Branding', 'Customer Journey',
+      'User Experience', 'Performance', 'Scalability', 'Growth', 'Strategy',
+      'Business Intelligence', 'Analytics', 'KPI', 'Optimization', 'Automation'
+    ];
+    
+    const found: string[] = [];
+    const lowerText = text.toLowerCase();
+    
+    businessTerms.forEach(term => {
+      if (lowerText.includes(term.toLowerCase())) {
+        found.push(term);
+      }
+    });
+    
+    return found.slice(0, 8); // Limit to top 8
+  }
+
+  private extractComplianceKeywords(text: string): string[] {
+    const complianceTerms = [
+      'GDPR', 'DSGVO', 'PCI-DSS', 'SOC 2', 'ISO 27001', 'HIPAA', 'PSD2',
+      'Security', 'Privacy', 'Data Protection', 'Compliance', 'Audit',
+      'Encryption', 'Authentication', 'Authorization', 'Access Control'
+    ];
+    
+    const found: string[] = [];
+    const lowerText = text.toLowerCase();
+    
+    complianceTerms.forEach(term => {
+      if (lowerText.includes(term.toLowerCase())) {
+        found.push(term);
+      }
+    });
+    
+    return found.slice(0, 6); // Limit to top 6
+  }
+
+  private generateLocalSummary(text: string): string {
+    const firstSentences = text.split('.').slice(0, 3).join('.').trim();
+    if (firstSentences.length > 200) {
+      return firstSentences.substring(0, 200) + '...';
+    }
+    return firstSentences + '.';
+  }
+
+  private generateHighPriorityRecommendations(text: string): string[] {
+    const lowerText = text.toLowerCase();
+    const recommendations: string[] = [];
+    
+    if (lowerText.includes('performance') || lowerText.includes('speed')) {
+      recommendations.push('Performance-Optimierung durch CDN und Caching implementieren');
+    }
+    if (lowerText.includes('mobile') || lowerText.includes('responsive')) {
+      recommendations.push('Mobile-First Design für bessere User Experience');
+    }
+    if (lowerText.includes('security') || lowerText.includes('sicherheit')) {
+      recommendations.push('Comprehensive Security Audit und Penetration Testing');
+    }
+    if (lowerText.includes('payment') || lowerText.includes('checkout')) {
+      recommendations.push('Optimierte Checkout-Experience für höhere Conversion Rate');
+    }
+    
+    return recommendations.slice(0, 3);
+  }
+
+  private generateMediumPriorityRecommendations(text: string): string[] {
+    return [
+      'A/B Testing Framework für kontinuierliche Optimierung',
+      'Personalisierung durch Machine Learning implementieren',
+      'Advanced Analytics und Customer Insights Dashboard'
+    ];
+  }
+
+  private generateLowPriorityRecommendations(text: string): string[] {
+    return [
+      'Social Media Integration für virales Marketing',
+      'Customer Review System für Vertrauensbildung',
+      'Internationalisierung für globale Expansion'
+    ];
+  }
+
+  private estimateBudgetFromText(text: string): any {
+    const lowerText = text.toLowerCase();
+    let baseAmount = 200000; // Base 200k
+    
+    // Extract budget if mentioned
+    const budgetMatch = text.match(/(\d{1,3}(?:\.\d{3})*)\s*(?:€|Euro)/g);
+    if (budgetMatch) {
+      const budgetStr = budgetMatch[0].replace(/[^\d]/g, '');
+      const mentionedBudget = parseInt(budgetStr);
+      if (mentionedBudget > 50000) {
+        baseAmount = mentionedBudget;
+      }
+    }
+    
+    // Adjust based on complexity indicators
+    if (lowerText.includes('enterprise') || lowerText.includes('microservices')) {
+      baseAmount *= 1.5;
+    }
+    if (lowerText.includes('ai') || lowerText.includes('machine learning')) {
+      baseAmount *= 1.3;
+    }
+    if (lowerText.includes('international') || lowerText.includes('multi-region')) {
+      baseAmount *= 1.2;
+    }
+    
+    return {
+      min: Math.round(baseAmount * 0.8),
+      max: Math.round(baseAmount * 1.3),
+      confidence: 'medium',
+      factors: [
+        'Projektgröße und Komplexität berücksichtigt',
+        'Technologie-Stack Komplexität einkalkuliert',
+        'Marktübliche Entwicklungskosten angewandt'
+      ]
+    };
+  }
+
+  private estimateTimelineFromText(text: string): any {
+    const lowerText = text.toLowerCase();
+    let months = 8; // Base 8 months
+    
+    // Extract timeline if mentioned
+    const timelineMatch = text.match(/(\d{1,2})\s*(?:-\s*(\d{1,2}))?\s*(?:Monat|month)/gi);
+    if (timelineMatch) {
+      const timeStr = timelineMatch[0].match(/\d{1,2}/g);
+      if (timeStr) {
+        months = parseInt(timeStr[0]);
+      }
+    }
+    
+    return {
+      estimated: months,
+      phases: [
+        { name: 'Discovery & Design', duration: Math.round(months * 0.2), dependencies: [], deliverables: ['Requirements'] },
+        { name: 'Development', duration: Math.round(months * 0.5), dependencies: ['Discovery'], deliverables: ['MVP'] },
+        { name: 'Testing & Launch', duration: Math.round(months * 0.3), dependencies: ['Development'], deliverables: ['Go-Live'] }
+      ],
+      criticalPath: ['Requirements Analysis', 'Core Development', 'Integration Testing', 'Go-Live']
+    };
+  }
+
+  private recommendTechStackFromText(text: string): any {
+    const lowerText = text.toLowerCase();
+    const stack = {
+      frontend: ['React', 'TypeScript'],
+      backend: ['Node.js', 'Express'],
+      database: ['PostgreSQL'],
+      infrastructure: ['Docker', 'AWS']
+    };
+    
+    // Frontend recommendations
+    if (lowerText.includes('vue')) {
+      stack.frontend = ['Vue.js', 'TypeScript'];
+    }
+    if (lowerText.includes('angular')) {
+      stack.frontend = ['Angular', 'TypeScript'];
+    }
+    if (lowerText.includes('pwa')) {
+      stack.frontend.push('PWA');
+    }
+    
+    // Backend recommendations
+    if (lowerText.includes('java') || lowerText.includes('spring')) {
+      stack.backend = ['Java', 'Spring Boot'];
+    }
+    if (lowerText.includes('microservices')) {
+      stack.backend.push('Microservices');
+    }
+    
+    // Database recommendations
+    if (lowerText.includes('mongodb')) {
+      stack.database.push('MongoDB');
+    }
+    if (lowerText.includes('redis')) {
+      stack.database.push('Redis');
+    }
+    if (lowerText.includes('elasticsearch')) {
+      stack.database.push('Elasticsearch');
+    }
+    
+    // Infrastructure
+    if (lowerText.includes('kubernetes')) {
+      stack.infrastructure.push('Kubernetes');
+    }
+    if (lowerText.includes('azure')) {
+      stack.infrastructure = ['Docker', 'Azure'];
+    }
+    
+    return stack;
+  }
+
+  private generateSuccessMetrics(text: string): any[] {
+    return [
+      { name: 'Conversion Rate', current: '2.1%', target: '4.5%', improvement: '+114%' },
+      { name: 'Page Load Time', current: '8s', target: '2s', improvement: '-75%' },
+      { name: 'Mobile Conversion', current: '1.2%', target: '3.8%', improvement: '+217%' },
+      { name: 'SEO Ranking', current: 'Position 15+', target: 'Top 10', improvement: 'Top 10' }
+    ];
+  }
+
+  private analyzeComplianceFromText(text: string): any[] {
+    const results: any[] = [];
+    const lowerText = text.toLowerCase();
+    
+    if (lowerText.includes('gdpr') || lowerText.includes('dsgvo')) {
+      results.push({
+        regulation: 'GDPR/DSGVO',
+        relevance: 'high',
+        foundKeywords: ['GDPR', 'Data Protection'],
+        requirements: ['Cookie Consent', 'Privacy Policy', 'Data Processing Records']
+      });
+    }
+    
+    if (lowerText.includes('pci') || lowerText.includes('payment')) {
+      results.push({
+        regulation: 'PCI-DSS',
+        relevance: 'high',
+        foundKeywords: ['Payment', 'Card Processing'],
+        requirements: ['Secure Payment Processing', 'Encryption', 'Security Monitoring']
+      });
+    }
+    
+    return results;
+  }
+
+  private assessRiskFromText(text: string): any {
+    const lowerText = text.toLowerCase();
+    let overallRisk = 5;
+    
+    // Increase risk based on complexity
+    if (lowerText.includes('enterprise') || lowerText.includes('large scale')) {
+      overallRisk += 1;
+    }
+    if (lowerText.includes('legacy') || lowerText.includes('migration')) {
+      overallRisk += 1;
+    }
+    if (lowerText.includes('tight deadline') || lowerText.includes('aggressive timeline')) {
+      overallRisk += 2;
+    }
+    
+    return {
+      overall: Math.min(overallRisk, 10),
+      security: lowerText.includes('payment') || lowerText.includes('financial') ? 7 : 5,
+      compliance: lowerText.includes('gdpr') || lowerText.includes('regulated') ? 6 : 4,
+      technical: lowerText.includes('microservices') || lowerText.includes('complex') ? 6 : 4,
+      recommendations: [
+        'Agile Entwicklungsansatz für Risikominimierung',
+        'Regelmäßige Stakeholder-Updates und Reviews',
+        'Comprehensive Testing-Strategie implementieren'
+      ]
+    };
+  }
+
+  private generateReportContent(): string {
+    if (!this.analysisResult) return '';
+    
+    return `AI DOCUMENT ANALYSIS REPORT
+===========================
+
+Industry: ${this.analysisResult.detectedIndustry?.name || 'Unknown'}
+Confidence: ${this.analysisResult.confidence || 0}%
+Analysis Date: ${new Date().toLocaleDateString('de-DE')}
+
+SUMMARY
+=======
+${this.analysisResult.summary || 'No summary available'}
+
+KEYWORDS
+========
+Technology: ${this.analysisResult.technologyKeywords?.join(', ') || 'None'}
+Business: ${this.analysisResult.businessKeywords?.join(', ') || 'None'}
+Compliance: ${this.analysisResult.complianceKeywords?.join(', ') || 'None'}
+
+HIGH PRIORITY RECOMMENDATIONS
+=============================
+${this.analysisResult.highPriorityRecommendations?.map((rec, i) => `${i + 1}. ${rec}`).join('\n') || 'None'}
+
+BUDGET ESTIMATION
+================
+${this.analysisResult.estimatedBudget ? 
+  `Min: ${this.formatCurrency(this.analysisResult.estimatedBudget.min)}\nMax: ${this.formatCurrency(this.analysisResult.estimatedBudget.max)}` : 
+  'Not available'}
+
+TIMELINE: ${this.analysisResult.timeline?.estimated || 'TBD'} months`;
+  }
+
+  private generateCSVContent(): string {
+    if (!this.analysisResult) return '';
+    
+    const rows = [
+      ['Category', 'Value'],
+      ['Industry', this.analysisResult.detectedIndustry?.name || 'Unknown'],
+      ['Confidence', `${this.analysisResult.confidence || 0}%`],
+      ['Summary Length', (this.analysisResult.summary?.length || 0).toString()],
+      ['Tech Keywords', (this.analysisResult.technologyKeywords?.length || 0).toString()],
+      ['Business Keywords', (this.analysisResult.businessKeywords?.length || 0).toString()]
+    ];
+    
+    return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+  }
+
+  // =============================================
+  // DEMO TEXT METHODS
+  // =============================================
 
   private getEcommerceDemoText(): string {
-    return `Projektausschreibung: E-Commerce Plattform "FashionForward Pro"
-Komplette Modernisierung und Neuentwicklung einer Enterprise E-Commerce-Lösung
+    return `E-Commerce Platform "ShopNext"
+Entwicklung einer modernen Online-Shopping-Plattform
 
-EXECUTIVE SUMMARY:
-FashionForward GmbH ist ein führendes deutsches Modeunternehmen mit 15 Jahren Marktpräsenz im Premium-Fashion-Segment. Wir betreiben aktuell einen Online-Shop mit ca. 50.000 aktiven Produkten über 200 Marken und erzielen einen stabilen Jahresumsatz von 25 Millionen Euro. Unser loyaler Kundenstamm umfasst 120.000 registrierte Nutzer, davon 60% Stammkunden mit regelmäßigen Bestellungen und einer durchschnittlichen Kauffrequenz von 3,2 Bestellungen pro Jahr.
+PROJEKTÜBERSICHT:
+Entwicklung einer skalierbaren E-Commerce-Lösung mit React, Node.js und PostgreSQL.
+Die Plattform soll 10.000+ Produkte verwalten und 1000+ gleichzeitige Nutzer unterstützen.
 
-AKTUELLE MARKTPOSITION UND HERAUSFORDERUNGEN:
-Unsere bestehende E-Commerce-Lösung basiert auf der veralteten Magento 1.9 Plattform und zeigt deutliche Alterungserscheinungen, die unsere Wettbewerbsfähigkeit beeinträchtigen. Die Performance ist kritisch geworden, besonders bei Traffic-Spitzen während Sale-Zeiten (Black Friday, Sommerschlussverkauf), wo Ladezeiten von bis zu 15 Sekunden auftreten. Unsere Mobile Conversion liegt bedenklich niedrig bei nur 1.2%, obwohl 75% unserer Website-Besucher mobile Endgeräte verwenden. Das Backend-System ist für unser Marketing-Team zu komplex geworden, was zu ineffizienten Arbeitsabläufen führt.
+TECHNISCHE ANFORDERUNGEN:
+- Frontend: React 18, TypeScript, Tailwind CSS
+- Backend: Node.js, Express.js, REST API
+- Datenbank: PostgreSQL, Redis für Caching
+- Payment: Stripe, PayPal Integration
+- Deployment: Docker, Kubernetes, AWS
 
-Spezifische Problemfelder:
-- Kritische Ladezeiten: 8-12 Sekunden auf Desktop, 15+ Sekunden auf mobilen Geräten
-- Häufige Server-Ausfälle bei über 1000 gleichzeitigen Nutzern während Peak-Zeiten
-- Veraltetes, nicht-responsives Design wirkt unprofessionell gegenüber modernen Konkurrenten
-- SEO-Performance deutlich schlechter als Branchendurchschnitt (Position 15-25 für Haupt-Keywords)
-- Fehlende Integration zu unserem neuen ERP-System SAP S/4HANA
-- Manueller, fehleranfälliger Bestellprozess zwischen Online-Shop und Lagerverwaltung
-- Keine Personalisierungsmöglichkeiten für individuelle Kundenerlebnisse
-- Veraltetes Payment-System ohne moderne Zahlungsmethoden (Apple Pay, Google Pay, Buy Now Pay Later)
+FEATURES:
+- Produktkatalog mit Such- und Filterfunktionen
+- Warenkorb und Checkout-Prozess
+- Benutzerverwaltung und Authentifizierung
+- Admin-Dashboard für Produktverwaltung
+- Mobile-responsive Design
+- Real-time Transaction Monitoring
+- API für Drittanbieter-Integration
+- Compliance-Dashboard und Reporting
 
-STRATEGISCHE GESCHÄFTSZIELE:
-Unsere neue E-Commerce-Plattform soll als strategischer Wachstumstreiber fungieren und folgende ambitionierte aber realistische Geschäftsziele unterstützen:
-
-Primäre Performance-Ziele:
-- Dramatische Steigerung der Conversion Rate von aktuell 2.1% auf mindestens 4.5% (114% Verbesserung)
-- Erhöhung der Mobile Conversion von 1.2% auf 3.8% (217% Verbesserung)
-- Reduzierung der durchschnittlichen Ladezeiten auf unter 3 Sekunden (Core Web Vitals optimiert)
-- Verbesserung der SEO-Rankings für 200+ Haupt-Keywords von Position 15+ auf Top 10
-- Vollständige Automatisierung des Order-to-Cash Prozesses zur Effizienzsteigerung
-- Steigerung des durchschnittlichen Warenkorbs (AOV) von €85 auf €110 (25% Erhöhung)
-
-Sekundäre Wachstumsziele:
-- Reduktion der Retourenquote durch verbesserte Produktpräsentation und Size-Guide
-- Implementierung eines hochpersonalisierten Shopping-Erlebnisses
-- Aufbau einer aktiven Community mit User-Generated Content und Reviews
-- Integration von Social Commerce Features (Instagram Shopping, Facebook Shops)
-- Vorbereitung für internationale Expansion in die DACH-Region (2026 geplant)
-
-DETAILLIERTE TECHNISCHE ANFORDERUNGEN:
-
-Frontend-Technologien und Architektur:
-Die neue Plattform soll als hochmoderne Progressive Web App (PWA) entwickelt werden mit folgenden spezifischen Technologien:
-- React 18+ oder Vue.js 3+ für eine performante, moderne Single-Page-Application mit optimaler SEO
-- TypeScript Implementierung für bessere Code-Qualität, Entwicklererfahrung und Wartbarkeit
-- Next.js oder Nuxt.js Framework für Server-Side Rendering, SEO-Optimierung und Performance
-- Tailwind CSS oder Styled Components für konsistentes, wartbares Design-System
-- Responsive Design mit Mobile-First Ansatz für optimale Multi-Device-Experience
-- PWA-Funktionalitäten: Offline-Funktionalität für Produktkatalog und Warenkorb
-- Push-Notifications für Marketing-Kampagnen, Preisalerts und Bestellstatus-Updates
-- Web Workers für Background-Tasks wie Inventory-Updates und Search-Indexing
-
-Backend-Architektur und Services:
-- Headless Commerce Architektur für maximale Flexibilität und Skalierbarkeit
-- Node.js mit Express.js oder Fastify für hochperformante API-Entwicklung
-- Alternative: Java Spring Boot für Enterprise-Stabilität und Robustheit
-- GraphQL API für effiziente, flexible Datenabfragen vom Frontend
-- RESTful APIs für nahtlose Third-Party Integrationen
-- Microservices-Architektur für optimale Skalierbarkeit mit folgenden Services:
-  * Product Catalog Service (Produktverwaltung, Kategorien, Attribute)
-  * User Management Service (Registrierung, Profile, Authentifizierung)
-  * Order Processing Service (Warenkorb, Checkout, Bestellabwicklung)
-  * Payment Gateway Service (Multi-Provider Payment-Processing)
-  * Inventory Management Service (Real-time Bestandsverwaltung)
-  * Recommendation Engine Service (AI-basierte Produktempfehlungen)
-  * Customer Service Integration (Support-Tickets, Live-Chat)
-
-Datenbank-Architektur und Data Management:
-- PostgreSQL als primäre transaktionale Datenbank für kritische Geschäftsdaten
-- Redis für High-Performance Session Management und Application-Caching
-- Elasticsearch für intelligente, facettierte Produktsuche und Filterung
-- MongoDB für flexibles Content Management (Blog, Reviews, User-Generated Content)
-- InfluxDB für detailliertes Analytics und Performance-Monitoring
-- Data Warehouse (Snowflake/BigQuery) für Advanced Business Intelligence und Reporting
-
-Cloud-Infrastruktur und DevOps:
-- Amazon Web Services (AWS) oder Microsoft Azure als stabiler Cloud-Provider
-- Containerisierung mit Docker und Kubernetes für Skalierbarkeit und Deployment-Flexibilität
-- Intelligent Auto-Scaling basierend auf Traffic-Mustern und Performance-Metriken
-- Content Delivery Network (CloudFlare oder AWS CloudFront) für statische Assets und Global Performance
-- Multi-Region Deployment für optimale Performance und Disaster Recovery
-- Comprehensive CI/CD Pipeline mit GitHub Actions oder Azure DevOps für automatisierte Deployments
-- Infrastructure as Code mit Terraform für reproduzierbare, versionierte Infrastruktur
-- Monitoring und Alerting mit Prometheus, Grafana und ELK Stack für proaktive Überwachung
-
-ERWEITERTE FUNKTIONALE ANFORDERUNGEN:
-
-Intelligenter Produktkatalog und Search:
-- Hierarchische Kategoriestruktur mit maximal 5 Ebenen für intuitive Navigation
-- Advanced Facetted Search mit 20+ konfigurierbaren Filteroptionen
-- Intelligent Search mit Autocomplete, Typo-Tolerance und Synonym-Erkennung
-- Visual Search für Fashion-Produkte über Bildupload und AI-Bildanalyse
-- Comprehensive Size Guide Integration mit virtueller Anprobe-Funktionalität
-- 360-Grad Produktansichten mit Zoom-Funktionalität für detaillierte Produktinspektion
-- Video-Integration für Produktpräsentationen und Styling-Tipps
-- Advanced Related Products und Cross-Selling Algorithmus mit Machine Learning
-
-Optimierte User Experience:
-- Nahtlose Gastbestellung ohne Registrierungszwang für höhere Conversion
-- Social Login Integration (Google, Facebook, Apple) für vereinfachte Registrierung
-- Hochpersonalisierte Produktempfehlungen basierend auf Browsing- und Kaufhistorie
-- Wishlist und Merklisten-Funktionalität mit Sharing-Möglichkeiten
-- Recently Viewed Products mit intelligenter Priorisierung
-- Stock Notifications für ausverkaufte Artikel mit automatischen Benachrichtigungen
-- AI-basierter Size Advisor basierend auf Kundenhistorie und Retourendaten
-- Integrated Live Chat mit Zendesk-Integration für sofortigen Kundensupport
-
-Shopping Cart und Checkout-Optimierung:
-- Persistent Cart über Sessions und Geräte hinweg für nahtlose Shopping-Experience
-- Express Checkout für Stammkunden mit gespeicherten Zahlungsdaten
-- Optimierter Guest Checkout-Prozess für maximale Conversion
-- Multiple Payment Methods Integration:
-  * Traditionelle Kreditkarten (Visa, Mastercard, American Express)
-  * PayPal und moderne Digital Wallets (Apple Pay, Google Pay)
-  * Buy Now Pay Later Optionen (Klarna Sofort, Lastschrift, Ratenkauf)
-  * SEPA Lastschrift für deutsche Kunden
-  * Kauf auf Rechnung nach automatischer Bonitätsprüfung
-- Intelligent Address Validation mit Deutsche Post API für korrekte Lieferadressen
-- Flexible Delivery Options (Standard, Express, Same-Day in Ballungsräumen)
-- Premium Gift Wrapping Service mit personalisierten Nachrichtenfunktionen
-
-Comprehensive Order Management:
-- Real-time Order Tracking mit automatischer Sendungsverfolgung
-- Automated Email Notifications für alle Bestellstatus-Updates
-- Intelligent Return Management mit QR-Code Labels für einfache Retouren
-- Exchange vs. Refund Options mit automatischer Bestandsabgleich
-- Partial Returns und Restocking mit intelligenter Rückerstattungslogik
-- Seamless Customer Service Integration für Support-Anfragen
-- Advanced Inventory Reservation während Checkout-Prozess
-
-KRITISCHE SYSTEM-INTEGRATIONEN:
-
-ERP-System Integration (SAP S/4HANA):
-- Bidirektionale Real-time Synchronisation für alle Geschäftsdaten
-- Automated Inventory Updates mit Konfliktbehandlung
-- Intelligent Purchase Order Generation basierend auf Verkaufstrends
-- Comprehensive Financial Data Exchange für Controlling und Buchhaltung
-- Customer Master Data Synchronization für einheitliche Kundensicht
-- Advanced Analytics Integration für Business Intelligence
-
-Logistics und Fulfillment Integration:
-- Multi-Carrier Integration (DHL, UPS, Hermes, DPD) mit Rate Shopping
-- Automated Shipping Label Generation mit optimaler Carrier-Auswahl
-- Comprehensive Track & Trace Funktionalität mit proaktiven Updates
-- Intelligent Returns Portal für Kunden mit automatischer RMA-Generierung
-- Advanced Warehouse Management System Integration (Manhattan Associates)
-- Cross-Docking und Drop-Shipping Support für Vendor-Fulfillment
-
-Marketing Automation und Analytics:
-- Klaviyo oder Mailchimp Integration für sophisticated Email Marketing
-- Segment.com als Customer Data Platform für 360-Grad Kundensicht
-- Google Analytics 4 und Google Tag Manager für comprehensive Web Analytics
-- Facebook Pixel und Conversion API für optimierte Social Media Marketing
-- Dynamic Retargeting für abandoned carts mit personalisierten Produktempfehlungen
-- Advanced A/B Testing Framework (Optimizely) für kontinuierliche Optimierung
-
-Payment Service Provider Integration:
-- Adyen als primärer PSP für alle Payment Methods mit höchster Sicherheit
-- Advanced Fraud Detection mit Machine Learning für Transaktionssicherheit
-- 3D Secure 2.0 Implementation für PCI DSS Compliance
-- Comprehensive PCI DSS Compliance für alle Zahlungsprozesse
-- Future-ready Recurring Payments für geplante Subscription-Services
-
-KÜNSTLICHE INTELLIGENZ UND MACHINE LEARNING INTEGRATION:
-
-Advanced Recommendation Engine:
-- Collaborative Filtering für "Kunden kauften auch" Empfehlungen
-- Content-based Filtering basierend auf detaillierten Produktattributen
-- Hybrid Approach für optimale Empfehlungsgenauigkeit
-- Real-time Personalization basierend auf Session-Verhalten und Kontext
-- Seasonal Trends Integration für saisonale Produktempfehlungen
-- Cross-category Recommendations für Upselling-Möglichkeiten
-
-Dynamic Pricing und Revenue Optimization:
-- Automated Competitor Price Monitoring mit Preisanpassungslogik
-- Demand-based Pricing Algorithmen für optimale Marge
-- Inventory-driven Price Optimization zur Bestandsoptimierung
-- Personalized Pricing für VIP-Kunden und Segment-spezifische Angebote
-- Automated Discount Campaigns basierend auf Kundenverhalten
-
-Customer Analytics und Insights:
-- Customer Lifetime Value Prediction für strategische Kundenbetreuung
-- Churn Prediction mit proaktiven Retention Campaigns
-- Advanced Segmentation für highly targeted Marketing-Maßnahmen
-- Next Best Action Recommendations für Kundenbetreuer
-- Intelligent Size Prediction basierend auf Kaufhistorie und Retourendaten
-
-Inventory Optimization:
-- Advanced Demand Forecasting für optimale Einkaufsplanung
-- Seasonal Trend Analysis mit externen Einflussfaktoren
-- Automated Reordering für Fast-Moving Items mit intelligenten Schwellenwerten
-- Slow-Moving Inventory Identification mit Abverkaufsstrategien
-- Optimal Stock Level Calculations unter Berücksichtigung von Lead Times
-
-PERFORMANCE UND SKALIERUNGS-ANFORDERUNGEN:
-
-Kritische Performance Requirements:
-- Ladezeiten unter 2 Sekunden für Kategorieseiten (First Contentful Paint)
-- Ladezeiten unter 3 Sekunden für Produktdetailseiten (Largest Contentful Paint)
-- 99.9% Uptime SLA mit proaktivem Monitoring und Alerting
-- Unterstützung für 5000+ gleichzeitige Nutzer ohne Performance-Degradation
-- Core Web Vitals Optimierung für optimale Google Rankings und User Experience
-- Progressive Image Loading mit Next-Gen Formaten (WebP, AVIF)
-- Lazy Loading für Below-the-Fold Content zur Ladezeit-Optimierung
-
-Advanced Caching-Strategie:
-- Multi-Level Caching (Browser, CDN, Application, Database) für optimale Performance
-- Redis für High-Performance Session und Shopping Cart Caching
-- Varnish oder Nginx für intelligentes HTTP Caching
-- Edge-Side Includes für personalisierte Inhalte bei gleichzeitigem Caching
-- Intelligent Cache Invalidation für Real-time Inventory Updates
-- API Response Caching mit TTL-basierter Invalidierung
-
-Global Content Delivery:
-- Global CDN mit 20+ Edge Locations für weltweite Performance
-- Intelligent Image Optimization mit WebP/AVIF Support und automatischer Formatwahl
-- Adaptive Image Sizing für verschiedene Devices und Auflösungen
-- Video Streaming Optimization für Produktpräsentationen
-- Font Optimization und Preloading für Performance-kritische Schriftarten
-
-BUDGET UND PROJEKTMANAGEMENT:
-
-Detaillierte Budget-Aufschlüsselung:
-Gesamtbudget: 850.000 - 1.200.000 Euro für komplette Umsetzung und Go-Live
-- Frontend Entwicklung (React/PWA): 250.000 - 300.000 Euro
-- Backend Entwicklung (Node.js/Microservices): 300.000 - 400.000 Euro
-- Mobile/PWA Entwicklung: 150.000 - 200.000 Euro
-- System-Integration & Testing: 200.000 - 250.000 Euro
-- UX/UI Design & Design System: 100.000 - 150.000 Euro
-- Projektmanagement & Qualitätssicherung: 150.000 - 200.000 Euro
-- Cloud Infrastructure (erstes Jahr): 50.000 - 75.000 Euro
-
-Detaillierte Projektphasen und Timeline:
-Gesamtprojektdauer: 12-15 Monate, aufgeteilt in strategische Phasen:
-
-Phase 1 - Discovery & Technical Foundation (Monate 1-3):
-- Comprehensive Requirements Analysis und Stakeholder Workshops
-- Technical Architecture Design und Technology Stack Finalization
-- Detailed UI/UX Design System Creation mit User Journey Mapping
-- Project Plan Refinement und Resource Allocation
-- Environment Setup und Development Infrastructure
-
-Phase 2 - Core Platform Development (Monate 4-8):
-- Backend API Development mit Microservices Architecture
-- Frontend Component Library und Design System Implementation
-- Database Schema Implementation und Migration Strategies
-- Core E-Commerce Functionality (Catalog, Cart, Checkout)
-- Payment Integration und Security Implementation
-
-Phase 3 - Advanced Features & Integration (Monate 9-12):
-- AI/ML Recommendation Engine Development und Training
-- ERP System Integration (SAP S/4HANA) mit Data Migration
-- Advanced Search Implementation mit Elasticsearch
-- Mobile PWA Development mit Offline Capabilities
-- Third-Party Service Integrations (Marketing, Analytics, Logistics)
-
-Phase 4 - Testing & Optimization (Monate 13-14):
-- Comprehensive Testing Strategy (Unit, Integration, E2E, Performance)
-- Security Audit und Penetration Testing
-- Load Testing und Performance Optimization
-- User Acceptance Testing mit Business Users und Key Customers
-- Go-Live Preparation und Rollback Strategies
-
-Phase 5 - Launch & Stabilization (Monat 15):
-- Production Deployment mit Blue-Green Strategy
-- Comprehensive Data Migration von Legacy System
-- 24/7 Go-Live Support für kritische erste Wochen
-- Performance Monitoring und Real-time Issue Resolution
-- Post-Launch Optimization basierend auf Live-Performance-Daten
-
-ERWARTETE DELIVERABLES:
-
-Technical Deliverables:
-- Complete Source Code mit Git Repository und Branching Strategy
-- Comprehensive Technical Documentation (Architecture, APIs, Deployment)
-- Interactive API Documentation (OpenAPI/Swagger) für alle Services
-- Database Schema Documentation mit ER-Diagrammen
-- Automated Deployment Scripts und CI/CD Pipelines
-- Infrastructure as Code Templates (Terraform/CloudFormation)
-- Performance Test Results und Optimization Reports
-- Security Audit Report mit Penetration Testing Results
-
-Business und Training Deliverables:
-- Comprehensive User Training Materials für alle Benutzerrollen
-- Admin Panel Documentation mit Step-by-Step Guides
-- Content Migration Scripts und Data Mapping Documentation
-- SEO Migration Plan mit URL-Mapping und Redirect Strategy
-- Google Analytics Setup mit Custom Dashboards und Goals
-- Marketing Automation Configuration (Email Templates, Workflows)
-- Comprehensive Go-Live Checklist mit Rollback Procedures
-- 6 Monate Premium Post-Launch Support mit SLA
-
-AUSWAHLKRITERIEN UND BEWERTUNGSMATRIX:
-
-Technical Excellence (30%):
-- Nachweis moderner Technologie-Stack Expertise (React, Node.js, Cloud)
-- Scalable Architecture Design Experience mit Microservices
-- Code Quality Standards und Best Practices Implementation
-- Performance Optimization Expertise mit nachweisbaren Erfolgen
-- Security Implementation Experience mit E-Commerce Focus
-
-E-Commerce Domain Expertise (25%):
-- Nachgewiesene E-Commerce Plattform Entwicklungserfahrung
-- Deep Understanding von Fashion/Retail Business Requirements
-- Conversion Optimization Kenntnisse mit messbaren Erfolgen
-- Mobile Commerce Expertise mit PWA Implementation
-- Payment Integration Experience mit modernen Payment Providers
-
-Project Management Excellence (20%):
-- Agile Development Methodology Expertise (Scrum/Kanban)
-- Transparent Communication und Stakeholder Management
-- Proactive Risk Management mit Mitigation Strategies
-- Timeline Adherence Track Record bei ähnlichen Projekten
-- Budget Control und Resource Management
-
-Design & User Experience (15%):
-- User-Centered Design Approach mit Design Thinking Methods
-- Mobile-First Design Thinking für optimale Multi-Device Experience
-- Conversion-Optimized UX mit A/B Testing Experience
-- Brand Consistency und Design System Development
-- Accessibility Compliance (WCAG 2.1 Level AA)
-
-References & Team Qualifications (10%):
-- Similar Project References mit verifizierbaren Erfolgen
-- Client Testimonials und Case Studies
-- Detailed Technical Case Studies mit Lessons Learned
-- Team Qualifications und Expertise Matrix
-- Relevant Certifications (AWS, Azure, Google Cloud)
-
-Wir freuen uns auf Ihre umfassende Bewerbung und ein detailliertes, strukturiertes Angebot. Bei Rückfragen stehen wir gerne für Klärungsgespräche zur Verfügung.
-
-Mit freundlichen Grüßen,
-Sarah Müller
-Head of Digital Commerce
-FashionForward GmbH
-
-Tel: +49 30 123456789
-Email: s.mueller@fashionforward.de
-Web: www.fashionforward.de
-LinkedIn: /company/fashionforward-gmbh
-
-Projektteam:
-- Dr. Michael Schmidt (CTO)
-- Anna Weber (Head of E-Commerce)
-- Thomas Bauer (Head of Marketing)
-- Lisa Chen (UX/UI Lead)`;
+SICHERHEIT: PCI-DSS, PSD2, GDPR
+BUDGET: €1.500.000 - €2.000.000
+TIMELINE: 18-24 Monate`;
   }
 
   private getHealthcareDemoText(): string {
-    return `Krankenhaus-Management System "MediCare Pro"
+    return `Healthcare Management System "MediCore"
+Krankenhaus-Verwaltungssystem für 500-Betten-Klinik
 
-KLINIK-PROFIL:
-Universitätsklinikum München - 1.200 Betten, 3.500 Mitarbeiter
+PROJEKTBESCHREIBUNG:
+Entwicklung eines FHIR-konformen Krankenhaus-Informationssystems
+für digitale Patientenakten und Workflow-Management.
 
-ANFORDERUNGEN:
-- FHIR-konforme elektronische Patientenakte
-- HIPAA und DSGVO Compliance
-- Java Spring Boot + React Frontend
-- End-to-End Verschlüsselung
+TECHNISCHE SPEZIFIKATION:
+- Backend: Java Spring Boot, Spring Security
+- Frontend: Angular 16, TypeScript
+- Datenbank: PostgreSQL mit HL7 FHIR Unterstützung
+- Integration: DICOM, HL7, Medizingeräte-APIs
+- Sicherheit: Ende-zu-Ende-Verschlüsselung, HIPAA-Compliance
 
-BUDGET: 2.500.000 - 3.200.000 Euro
-TIMELINE: 18 Monate`;
+KERNFUNKTIONEN:
+- Elektronische Patientenakten (EPA)
+- Terminverwaltung und Ressourcenplanung
+- Medikamentenverwaltung mit Interaktionsprüfung
+- Labor- und Bildgebungsintegration
+- Compliance-Dashboard und Audit-Logs
+- Telemedicine-Portal für Remote-Consultations
+- Mobile App für Ärzte und Pflegepersonal
+- Integration mit Medizingeräten (IoMT)
+- Real-time Monitoring und Alerts
+- Patientenportal mit Terminen und Befunden
+
+COMPLIANCE: HIPAA, DSGVO, MDR, FDA
+SICHERHEIT: End-to-End Encryption, Multi-Factor Authentication
+BUDGET: €800.000 - €1.200.000
+TIMELINE: 12-15 Monate
+TEAM: 8-10 Entwickler, 2 Security Experten, 1 Compliance Officer`;
   }
 
   private getFintechDemoText(): string {
-    return `Payment-Platform "SecurePay"
+    return `Fintech Platform "SecurePay"
+Digitale Payment-Lösung für KMU
 
-ANFORDERUNGEN:
-- PSD2-konforme Strong Customer Authentication
-- Real-time Payment Processing (<100ms)
-- PCI-DSS Level 1 Compliance
+PROJEKTKONZEPT:
+Entwicklung einer PCI-DSS-konformen Payment-Plattform
+mit Real-time Fraud Detection und Multi-Currency Support.
+
+TECHNISCHE ARCHITEKTUR:
+- Microservices: Java Spring Boot, Spring Cloud
+- Frontend: React, TypeScript, Material-UI
+- Datenbank: PostgreSQL, MongoDB für Analytics
+- Message Queue: Apache Kafka
+- Security: OAuth 2.0, JWT, 2FA, HSM
+
+HAUPTFUNKTIONEN:
+- Payment Processing (Kreditkarten, SEPA, PayPal)
 - Fraud Detection mit Machine Learning
+- Multi-Currency und Wechselkurs-Management
+- PCI-DSS Level 1 Compliance
+- Real-time Transaction Monitoring
+- API für Drittanbieter-Integration
+- Compliance-Dashboard und Reporting
+- Mobile Payment SDK
+- Subscription Management
+- Chargeback Protection
+- Risk Scoring Engine
+- Blockchain-Integration für Transparenz
 
-BUDGET: 3.500.000 - 4.800.000 Euro
-TIMELINE: 24 Monate`;
+SICHERHEIT: PCI-DSS, PSD2, GDPR, SOC 2 Type II
+REGULIERUNG: BaFin, PCI Security Council
+BUDGET: €1.500.000 - €2.000.000
+TIMELINE: 18-24 Monate
+TEAM: 12-15 Entwickler, 3 Security Experten, 2 Compliance Officer`;
   }
 
   private getManufacturingDemoText(): string {
-    return `Smart Factory Initiative "IndustryConnect 4.0"
+    return `Smart Factory IoT Platform "IndustryConnect"
+Industry 4.0 Lösung für Produktionsoptimierung
 
-TRANSFORMATION:
-- 15.000+ IoT-Sensoren
-- MQTT-Protokoll für Sensor-Kommunikation
-- Predictive Maintenance mit ML
-- Digital Twin Implementation
+PROJEKTBESCHREIBUNG:
+Entwicklung einer IoT-basierten Smart Factory Plattform
+für Predictive Maintenance und Produktionsoptimierung.
 
-BUDGET: 4.200.000 - 5.500.000 Euro
-TIMELINE: 30 Monate`;
+TECHNISCHE INFRASTRUKTUR:
+- Backend: Java Spring Boot, Microservices
+- IoT: MQTT, Apache Kafka, InfluxDB
+- Frontend: Angular, TypeScript, D3.js
+- Cloud: AWS IoT Core, Lambda, DynamoDB
+- Analytics: Apache Spark, TensorFlow
+
+KERNFEATURES:
+- 15.000+ IoT Sensoren Integration
+- Real-time Production Monitoring
+- Predictive Maintenance AI
+- Quality Control Automation
+- Supply Chain Optimization
+- Energy Management System
+- Worker Safety Monitoring
+- OEE (Overall Equipment Effectiveness)
+- Digital Twin Technology
+- Automated Reporting
+
+COMPLIANCE: ISO 9001, ISO 14001, Industry 4.0
+BUDGET: €2.500.000 - €3.500.000
+TIMELINE: 24-30 Monate
+TEAM: 20+ Entwickler, IoT Spezialisten, Data Scientists`;
   }
 }

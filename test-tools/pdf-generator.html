@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Test-Datei Generator (BITS Edition)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px; background: #f5f5f5; }
+        .container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .button-group { display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+        button { background: linear-gradient(135deg, #007bff, #0056b3); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .preview { background: #f8f9fa; border: 1px solid #dee2e6; padding: 20px; margin-top: 20px; border-radius: 8px; font-family: monospace; }
+        .download-info { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px; margin-top: 20px; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📄 PDF Test-Datei Generator (BITS Edition)</h1>
+
+        <div class="button-group">
+            <button onclick="generateBitsTechPDF()">🔧 BITS Tech-Projekt</button>
+            <button onclick="generateBitsConsultingPDF()">💼 BITS Consulting Report</button>
+            <button onclick="generateBitsMLPDF()">🤖 BITS AI & ML Studie</button>
+            <button onclick="generateBitsSimplePDF()">📝 Einfaches Testdokument</button>
+        </div>
+
+        <div class="preview">
+            <h3>Vorschau:</h3>
+            <div id="previewContent">Wählen Sie oben eine Datei aus.</div>
+        </div>
+
+        <div id="downloadInfo" class="download-info">
+            ✅ PDF wurde heruntergeladen – bereit für AI Docs Assist Tests.
+        </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+
+        function showDownloadInfo() {
+            document.getElementById('downloadInfo').style.display = 'block';
+            setTimeout(() => document.getElementById('downloadInfo').style.display = 'none', 5000);
+        }
+
+        function updatePreview(title, content) {
+            document.getElementById('previewContent').innerHTML = `<strong>${title}</strong><br><br>${content.substring(0, 300)}...`;
+        }
+
+        function createPDF(title, content, filename) {
+            const doc = new jsPDF();
+            doc.setFontSize(16);
+            doc.text(title, 20, 20);
+            doc.setFontSize(12);
+            const lines = doc.splitTextToSize(content, 170);
+            doc.text(lines, 20, 35);
+            doc.save(filename);
+            showDownloadInfo();
+        }
+
+        function generateBitsTechPDF() {
+            const content = `BITS Digital Solutions: Technisches Projektdokument
+
+PROJEKTZIEL:
+Entwicklung einer skalierbaren Cloud-Anwendung zur Dokumentenverwaltung mit KI-gestützter Analyse.
+
+TECHNOLOGIE-STACK:
+• Frontend: Angular 16, Responsive Design
+• Backend: Spring Boot (REST API), Java 17
+• Datenbank: PostgreSQL, Elasticsearch
+• Cloud & DevOps: Docker, Kubernetes, GitLab CI/CD, AWS
+• Sicherheit: Keycloak, OAuth2, JWT
+
+KOMPETENZBEREICHE:
+- Digital Solutions
+- Cloud Native Entwicklung
+- AI Integration (OpenAI API, ML-Modelle)
+- Security by Design
+
+PHASEN:
+1. Architekturentwurf & Prototyp
+2. Entwicklung & Integration
+3. Testautomatisierung (JUnit, Cypress)
+4. Deployment & Betrieb (AWS EKS)
+`;
+            updatePreview("BITS Tech-Projekt", content);
+            createPDF("BITS Tech-Projekt", content, 'bits-tech-projekt.pdf');
+        }
+
+        function generateBitsConsultingPDF() {
+            const content = `BITS Consulting Report: Digital Transformation
+
+PROJEKTHINTERGRUND:
+Beratung zur Optimierung von Geschäftsprozessen im Rahmen der digitalen Transformation.
+
+KERNBEREICHE:
+• Prozessanalyse & Workflow-Optimierung
+• Einführung von Collaboration-Tools (Jira, Confluence, Miro)
+• Cloud-Migration (Azure)
+• Change Management & Schulungen
+
+STRATEGIE:
+1. IST-Analyse
+2. Zielarchitektur
+3. Implementierungsplan
+4. Erfolgsmessung (KPIs)
+`;
+            updatePreview("BITS Consulting Report", content);
+            createPDF("BITS Consulting Report", content, 'bits-consulting-report.pdf');
+        }
+
+        function generateBitsMLPDF() {
+            const content = `BITS AI & ML Studie: Dokumentenanalyse
+
+ABSTRACT:
+Analyse der Effizienz von KI-Algorithmen bei der automatisierten Dokumentenverarbeitung.
+
+METHODIK:
+• Datengrundlage: 5000 Unternehmensdokumente
+• Modelle: OpenAI GPT, TensorFlow, PyTorch
+• Pipeline: Tokenisierung, Named Entity Recognition, Topic Clustering
+• Evaluationsmetriken: Accuracy, F1-Score, Recall
+
+ERGEBNIS:
+- GPT liefert präzise Zusammenfassungen
+- TensorFlow Modelle für Klassifikation
+- Empfohlene Architektur: Hybridansatz
+`;
+            updatePreview("BITS AI & ML Studie", content);
+            createPDF("BITS AI & ML Studie", content, 'bits-ai-ml-studie.pdf');
+        }
+
+        function generateBitsSimplePDF() {
+            const content = `BITS Einfaches Testdokument
+
+ZWECK:
+Dieses Dokument dient zum Testen der AI Document Assistant Funktionen.
+
+INHALT:
+• Kurzer Beispieltext mit Technologiebegriffen: Angular, Spring Boot, Docker, PostgreSQL
+• Ziel: Test von Zusammenfassung, Keyword-Extraktion und Technologie-Erkennung
+
+SCHLUSSFOLGERUNG:
+Dieses Dokument sollte eine prägnante AI-Antwort erzeugen.
+`;
+            updatePreview("BITS Einfaches Testdokument", content);
+            createPDF("BITS Einfaches Testdokument", content, 'bits-einfach-test.pdf');
+        }
+    </script>
+</body>
+</html>
