@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   backend:
     build:
@@ -8,9 +10,10 @@ services:
       - "8080:8080"
     environment:
       - SPRING_PROFILES_ACTIVE=docker
-      - CORS_ALLOWED_ORIGIN=http://localhost:4200,http://frontend
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
-      - DEBUG_API_KEY=${OPENAI_API_KEY:-your-openai-key-here}
+      # Wenn Nginx im Frontend proxyt, sind CORS-Header hier nicht nötig.
+      # - CORS_ALLOWED_ORIGIN=http://localhost:4200,http://frontend
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DEBUG_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=gpt-3.5-turbo
       - JAVA_OPTS=-Xmx1024m -Xms512m
       - SERVER_PORT=8080
@@ -19,6 +22,12 @@ services:
     volumes:
       - ./backend/logs:/app/logs
       - backend-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     restart: unless-stopped
     networks:
       - app-network
@@ -32,6 +41,7 @@ services:
       - "4200:80"
     environment:
       - NODE_ENV=production
+      # Angular verwendet in PROD `apiUrl: /api` (siehe environment.prod.ts).
     depends_on:
       - backend
     healthcheck:
@@ -44,7 +54,7 @@ services:
     networks:
       - app-network
 
-  # Optional: Database service (if needed)
+  # Optional: Postgres (auskommentiert)
   # database:
   #   image: postgres:15-alpine
   #   container_name: ai-doc-assist-db
@@ -67,5 +77,5 @@ volumes:
 
 networks:
   app-network:
-    driver: bridge
     name: ai-doc-assist-network
+    driver: bridge

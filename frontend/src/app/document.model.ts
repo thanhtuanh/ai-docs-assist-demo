@@ -1,38 +1,47 @@
-export interface Document {
-  id?: string;
-  filename: string;
-  fileType: string;
-  uploadDate: Date;
-  content: string;
+// src/app/document.model.ts
+export interface AnalysisResult {
+  // Core Analysis Data
   summary?: string;
   keywords?: string[];
-  recommendations?: Recommendation[];
-  sentiment?: string;
-  qualityScore?: number;
-}
-
-export interface AnalysisResult {
-  summary: string;
-  keywords: string[];
-  keywordCategories?: KeywordCategories;
-  recommendations: Recommendation[];
-  sentiment: string;
-  tone: string;
-  qualityScore: number;
+  sentiment?: SentimentResult | string;
   readabilityScore?: number;
+  recommendations?: Recommendation[];
+  qualityScore?: number;
+  
+  // Document Information
+  documentType?: string;
+  language?: string;
+  wordCount?: number;
+  
+  // Structure Information
   hasHeadings?: boolean;
   hasLists?: boolean;
   hasCodeBlocks?: boolean;
+  
+  // Additional Analysis Features
+  suggestedComponents?: string[];
+  keywordCategories?: KeywordCategories;
   qualityIndicators?: QualityIndicators;
-  statistics?: TextStatistics;
+  
+  // Metadata
+  analysisId?: string;
+  timestamp?: string;
+  filename?: string;
+}
+
+export interface SentimentResult {
+  score: number;
+  label: string;
+  confidence?: number;
 }
 
 export interface Recommendation {
-  category: string;
+  id?: string | number;
+  title: string;
+  description: string;
   priority: 'KRITISCH' | 'HOCH' | 'MITTEL' | 'NIEDRIG';
-  recommendation: string;
-  reasoning: string;
-  tools?: string[];
+  category?: string;
+  type?: string;
 }
 
 export interface KeywordCategories {
@@ -48,11 +57,41 @@ export interface QualityIndicators {
   technicalDepth: number;
 }
 
-export interface TextStatistics {
-  wordCount: number;
-  sentenceCount: number;
-  paragraphCount: number;
-  averageWordsPerSentence: number;
-  uniqueWords: number;
-  lexicalDiversity: number;
+// Additional Types for Industry-specific Analysis
+export interface IndustryAnalysisOptions {
+  industry?: string;
+  generateSummary?: boolean;
+  extractKeywords?: boolean;
+  generateRecommendations?: boolean;
+  performSentimentAnalysis?: boolean;
+  calculateQualityScore?: boolean;
+  detailedMode?: boolean;
+}
+
+// Extended Analysis Result for Enhanced Features
+export interface EnhancedAnalysisResult extends AnalysisResult {
+  industrySpecific?: {
+    industry: string;
+    relevanceScore: number;
+    industryKeywords: string[];
+    complianceCheck?: ComplianceResult[];
+  };
+  
+  processing?: {
+    duration: number;
+    model: string;
+    confidence: number;
+  };
+  
+  export?: {
+    formats: string[];
+    url?: string;
+  };
+}
+
+export interface ComplianceResult {
+  rule: string;
+  status: 'PASSED' | 'FAILED' | 'WARNING';
+  message: string;
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
 }

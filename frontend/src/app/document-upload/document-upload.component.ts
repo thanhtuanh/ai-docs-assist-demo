@@ -1,9 +1,9 @@
 // src/app/document-upload/document-upload.component.ts
-import { Component, ViewChild, ElementRef, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { AnalysisFeedback, FeedbackService } from '../feedback.service';
+import { EnhancedAnalysisResult, Industry } from '../models/industry.interfaces';
+import { ApiService } from '../services/api.service';
 import { IndustryService } from '../services/industry.service';
-import { ApiService, ApiFeedbackData } from '../services/api.service';
-import { FeedbackService, AnalysisFeedback } from '../feedback.service';
-import { Industry, EnhancedAnalysisResult } from '../models/industry.interfaces';
 
 interface TextLimits {
   free: number;
@@ -22,47 +22,47 @@ export class DocumentUploadComponent implements OnInit {
   // File handling properties
   selectedFile: File | null = null;
   isDragOver: boolean = false;
-  
+
   // Text input properties
   textInput: string = '';
-  
+
   // Analysis state
   isAnalyzing: boolean = false;
   analysisResult: EnhancedAnalysisResult | null = null;
   errorMessage: string = '';
-  
+
   // Industry selection
   selectedIndustry: string = 'auto';
   industries: Industry[] = [];
-  
+
   // Feedback properties
   showFeedback: boolean = false;
   feedbackRating: number = 0;
   feedbackComment: string = '';
   feedbackSubmitted: boolean = false;
   analysisId: string = '';
-  
+
   // Text limits configuration
   textLimits: TextLimits = {
     free: 100000,      // 100k chars (~40-50 pages)
     premium: 500000,   // 500k chars (~200-250 pages)
     enterprise: 2000000 // 2M chars (~800-1000 pages)
   };
-  
+
   private currentPlan: 'free' | 'premium' | 'enterprise' = 'free';
 
   constructor(
     private industryService: IndustryService,
     private apiService: ApiService,
     private feedbackService: FeedbackService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.industries = this.industryService.getAllIndustries();
   }
 
   // ===== INDUSTRY SELECTION METHODS =====
-  
+
   setIndustry(industryId: string): void {
     this.selectedIndustry = industryId;
     this.clearResults();
@@ -90,7 +90,7 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== FILE HANDLING METHODS =====
-  
+
   onFileAreaClick(): void {
     this.fileInput.nativeElement.click();
   }
@@ -118,7 +118,7 @@ export class DocumentUploadComponent implements OnInit {
   onFileDrop(event: DragEvent): void {
     event.preventDefault();
     this.isDragOver = false;
-    
+
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
       this.selectedFile = files[0];
@@ -169,16 +169,16 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== TEXT INPUT METHODS =====
-  
+
   loadDemoText(industryType?: string): void {
     const demoType = industryType || 'ecommerce';
     this.textInput = this.getDemoTextByIndustry(demoType);
-    
+
     // Auto-select the corresponding industry
     if (industryType) {
       this.selectedIndustry = industryType;
     }
-    
+
     this.clearResults();
   }
 
@@ -189,12 +189,12 @@ export class DocumentUploadComponent implements OnInit {
       'fintech': this.getFintechDemoText(),
       'manufacturing': this.getManufacturingDemoText()
     };
-    
+
     return demoTexts[industryType] || demoTexts['ecommerce'];
   }
 
   // ===== TEXT LIMIT METHODS =====
-  
+
   getTextLimit(): number {
     return this.textLimits[this.currentPlan];
   }
@@ -204,86 +204,71 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== ANALYSIS METHODS =====
-  
+
   async analyzeDocument(): Promise<void> {
     if (!this.selectedFile || this.isAnalyzing) return;
-
     this.isAnalyzing = true;
     this.clearResults();
 
-    try {
-      // Use API service for real backend integration
-      this.apiService.analyzeDocument(
-        this.selectedFile, 
+    this.apiService
+      .analyzeDocument(
+        this.selectedFile,
         this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
-      ).subscribe({
+      )
+      .subscribe({
         next: (result) => {
-          this.analysisResult = result;
+          this.analysisResult = this.normalizeAnalysisResult(result);
           this.handleAnalysisComplete();
         },
-        error: (error) => {
-          // Fallback to local analysis if API fails
+        error: () => {
+          // Fallback für Demo
           this.fallbackToLocalAnalysis('document');
         }
       });
-      
-    } catch (error) {
-      this.errorMessage = 'Error analyzing document. Please try again.';
-      console.error('Analysis error:', error);
-      this.isAnalyzing = false;
-    }
   }
 
   async analyzeText(): Promise<void> {
     if (!this.textInput.trim() || this.isAnalyzing) return;
-
     this.isAnalyzing = true;
     this.clearResults();
 
-    try {
-      // Try API first
-      this.apiService.analyzeText(
+    this.apiService
+      .analyzeText(
         this.textInput,
         this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
-      ).subscribe({
+      )
+      .subscribe({
         next: (result) => {
-          this.analysisResult = result;
+          this.analysisResult = this.normalizeAnalysisResult(result);
           this.handleAnalysisComplete();
         },
-        error: (error) => {
-          // Fallback to local analysis if API fails
-          console.log('API not available, using local analysis...');
+        error: () => {
+          // Fallback für Demo
           this.fallbackToLocalAnalysis('text');
         }
       });
-      
-    } catch (error) {
-      this.errorMessage = 'Error analyzing text. Please try again.';
-      console.error('Analysis error:', error);
-      this.isAnalyzing = false;
-    }
   }
 
   private async fallbackToLocalAnalysis(type: 'document' | 'text'): Promise<void> {
     try {
       // Simulate API delay for demo purposes
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       let textToAnalyze = '';
       if (type === 'document' && this.selectedFile) {
         textToAnalyze = await this.readFileContent(this.selectedFile);
       } else {
         textToAnalyze = this.textInput;
       }
-      
+
       // Perform local industry-specific analysis
       this.analysisResult = this.industryService.analyzeText(
         textToAnalyze,
         this.selectedIndustry === 'auto' ? undefined : this.selectedIndustry
       );
-      
+
       this.handleAnalysisComplete();
-      
+
     } catch (error) {
       this.errorMessage = 'Error in local analysis. Please try again.';
       console.error('Local analysis error:', error);
@@ -297,7 +282,7 @@ export class DocumentUploadComponent implements OnInit {
     if (this.selectedIndustry === 'auto' && this.analysisResult) {
       this.selectedIndustry = this.analysisResult.detectedIndustry.id;
     }
-    
+
     // Generate unique analysis ID and show feedback option
     this.analysisId = this.generateAnalysisId();
     this.showFeedback = true;
@@ -315,7 +300,7 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== FEEDBACK METHODS =====
-  
+
   setFeedbackRating(rating: number): void {
     this.feedbackRating = rating;
   }
@@ -333,20 +318,20 @@ export class DocumentUploadComponent implements OnInit {
 
     try {
       await this.feedbackService.submitFeedback(feedbackData);
-      
+
       // Store our detailed feedback separately in localStorage
       this.storeFeedbackDetails();
-      
+
       this.feedbackSubmitted = true;
-      
+
       // Show success message
       setTimeout(() => {
         alert('Vielen Dank für Ihr Feedback! Es hilft uns, die Analyse zu verbessern.');
       }, 100);
-      
+
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      
+
       // Fallback: store locally
       this.storeFeedbackDetails();
       this.feedbackSubmitted = true;
@@ -365,22 +350,113 @@ export class DocumentUploadComponent implements OnInit {
         timestamp: new Date().toISOString(),
         analysisType: this.selectedFile ? 'document' : 'text'
       };
-      
+
       const existingFeedbacks = JSON.parse(localStorage.getItem('analysis_feedbacks') || '[]');
       existingFeedbacks.push(feedbackDetails);
-      
+
       // Keep only last 50 feedbacks
       if (existingFeedbacks.length > 50) {
         existingFeedbacks.splice(0, existingFeedbacks.length - 50);
       }
-      
+
       localStorage.setItem('analysis_feedbacks', JSON.stringify(existingFeedbacks));
-      
+
       console.log('Feedback details stored locally:', feedbackDetails);
     } catch (error) {
       console.error('Error storing feedback details:', error);
     }
   }
+
+  private normalizeAnalysisResult(resp: any): EnhancedAnalysisResult {
+    // mögliche Quellen in der Antwort
+    const doc = resp?.document ?? {};
+    // manche Backends legen das Ergebnis unter document.analysis/result/data ab
+    const core =
+      doc.analysis ?? doc.result ?? doc.data ?? resp?.analysis ?? resp?.data ?? {};
+
+    const md = resp?.metadata ?? {};
+    const fallbackId = this.selectedIndustry || 'auto';
+    const fallbackName = this.getIndustryName(fallbackId);
+
+    // detectedIndustry kann String ODER Objekt sein
+    const diRaw =
+      core.detectedIndustry ?? md.detectedIndustry ?? core.industry ?? md.industry;
+
+    let detectedIndustry:
+      | { id: string; name: string; description?: string }
+      | null = null;
+
+    if (typeof diRaw === 'string') {
+      detectedIndustry = { id: diRaw, name: this.getIndustryName(diRaw), description: '' };
+    } else if (diRaw && (diRaw.id || diRaw.name)) {
+      detectedIndustry = {
+        id: diRaw.id ?? fallbackId,
+        name: diRaw.name ?? this.getIndustryName(diRaw.id ?? fallbackId),
+        description: diRaw.description ?? ''
+      };
+    } else {
+      detectedIndustry = { id: fallbackId, name: fallbackName, description: '' };
+    }
+
+    // Keywords aus verschiedenen möglichen Stellen einsammeln
+    const kw =
+      core.keywords ?? md.keywords ?? doc.keywords ?? {
+        technology: core.technologyKeywords ?? [],
+        business: core.businessKeywords ?? [],
+        compliance: core.complianceKeywords ?? []
+      };
+
+    const technologyKeywords = kw.technology ?? core.technologyKeywords ?? [];
+    const businessKeywords = kw.business ?? core.businessKeywords ?? [];
+    const complianceKeywords = kw.compliance ?? core.complianceKeywords ?? [];
+
+    const recommendations =
+      core.recommendations ?? md.recommendations ?? {
+        high: core.highPriorityRecommendations ?? [],
+        medium: core.mediumPriorityRecommendations ?? [],
+        low: core.lowPriorityRecommendations ?? []
+      };
+
+    const estimatedBudget =
+      core.estimatedBudget ?? md.estimatedBudget ?? { min: 0, max: 0, confidence: 'n/a', factors: [] };
+
+    const timeline =
+      core.timeline ?? md.timeline ?? { estimated: 0, phases: [], criticalPath: [] };
+
+    const riskAssessment =
+      core.riskAssessment ?? md.riskAssessment ?? {
+        overall: 0, security: 0, compliance: 0, technical: 0, recommendations: []
+      };
+
+    const recommendedStack =
+      core.recommendedStack ?? md.recommendedStack ?? {
+        frontend: [], backend: [], database: [], infrastructure: []
+      };
+
+    const summary =
+      core.summary ?? md.summary ?? doc.summary ?? '';
+
+    const confidence =
+      core.confidence ?? md.confidence ?? 50;
+
+    return {
+      summary,
+      detectedIndustry,
+      confidence,
+      technologyKeywords,
+      businessKeywords,
+      complianceKeywords,
+      highPriorityRecommendations: recommendations.high ?? [],
+      mediumPriorityRecommendations: recommendations.medium ?? [],
+      lowPriorityRecommendations: recommendations.low ?? [],
+      estimatedBudget,
+      timeline,
+      riskAssessment,
+      recommendedStack,
+      successMetrics: core.successMetrics ?? md.successMetrics ?? []
+    } as unknown as EnhancedAnalysisResult;
+  }
+
 
   resetFeedback(): void {
     this.feedbackRating = 0;
@@ -405,7 +481,7 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== UI HELPER METHODS =====
-  
+
   getConfidenceClass(confidence: number): string {
     if (confidence >= 70) return 'high';
     if (confidence >= 40) return 'medium';
@@ -438,61 +514,61 @@ export class DocumentUploadComponent implements OnInit {
   }
 
   // ===== EXPORT METHODS =====
-  
+
   exportToPDF(): void {
     if (!this.analysisResult) return;
-    
+
     const content = this.generateReportContent();
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-report-${Date.now()}.txt`;
     link.click();
-    
+
     URL.revokeObjectURL(url);
   }
 
   exportToExcel(): void {
     if (!this.analysisResult) return;
-    
+
     const csvContent = this.generateCSVContent();
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-data-${Date.now()}.csv`;
     link.click();
-    
+
     URL.revokeObjectURL(url);
   }
 
   exportToJSON(): void {
     if (!this.analysisResult) return;
-    
+
     const dataStr = JSON.stringify(this.analysisResult, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = `analysis-result-${Date.now()}.json`;
     link.click();
-    
+
     URL.revokeObjectURL(url);
   }
 
   shareResults(): void {
     if (!this.analysisResult) return;
-    
+
     const shareData = {
       title: 'AI Document Analysis Results',
       text: `Branche: ${this.analysisResult.detectedIndustry.name}\nSicherheit: ${this.analysisResult.confidence}%\nBudget: ${this.formatCurrency(this.analysisResult.estimatedBudget.min)} - ${this.formatCurrency(this.analysisResult.estimatedBudget.max)}`,
       url: window.location.href
     };
-    
+
     if (navigator.share) {
       navigator.share(shareData).catch(console.error);
     } else {
@@ -508,7 +584,7 @@ export class DocumentUploadComponent implements OnInit {
 
   private generateReportContent(): string {
     if (!this.analysisResult) return '';
-    
+
     return `AI DOCUMENT ANALYSIS REPORT
 ===========================
 
@@ -540,7 +616,7 @@ TIMELINE: ${this.analysisResult.timeline.estimated} Monate`;
 
   private generateCSVContent(): string {
     if (!this.analysisResult) return '';
-    
+
     const rows = [
       ['Kategorie', 'Wert'],
       ['Branche', this.analysisResult.detectedIndustry.name],
@@ -549,12 +625,12 @@ TIMELINE: ${this.analysisResult.timeline.estimated} Monate`;
       ['Budget Max', this.formatCurrency(this.analysisResult.estimatedBudget.max)],
       ['Timeline', `${this.analysisResult.timeline.estimated} Monate`]
     ];
-    
+
     return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
   }
 
   // ===== UTILITY METHODS =====
-  
+
   private clearResults(): void {
     this.analysisResult = null;
     this.errorMessage = '';
@@ -563,7 +639,7 @@ TIMELINE: ${this.analysisResult.timeline.estimated} Monate`;
   }
 
   // ===== DEMO TEXT METHODS (Shortened for brevity) =====
-  
+
   private getEcommerceDemoText(): string {
     return `Projektausschreibung: E-Commerce Plattform "FashionForward Pro"
 Komplette Modernisierung und Neuentwicklung einer Enterprise E-Commerce-Lösung
