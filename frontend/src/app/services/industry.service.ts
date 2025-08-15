@@ -1,8 +1,12 @@
+// src/app/services/industry.service.ts
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
-import { ApiService, IndustryAnalysisResult } from './api.service';
+import { map, catchError, tap } from 'rxjs/operators';
+import { ApiService, IndustryDetectionResponse } from './api.service';
 
+/**
+ * ✅ Industry Interface für UI-Darstellung
+ */
 export interface Industry {
   id: string;
   name: string;
@@ -15,28 +19,32 @@ export interface Industry {
   focusAreas: string[];
 }
 
+/**
+ * ✅ KORRIGIERTER IndustryService - Backend-Integration Fixed
+ */
 @Injectable({ providedIn: 'root' })
 export class IndustryService {
   
-  private industries: Industry[] = [
+  // 📋 Lokale UI-Definitionen (unverändert für Performance)
+  private readonly uiIndustries: Industry[] = [
     {
-      id: 'automotive',
-      name: 'Automotive',
-      icon: '🚗',
-      description: 'Fahrzeugbau, Elektromobilität, Automotive Technology',
-      keywords: ['auto', 'fahrzeug', 'kfz', 'bmw', 'mercedes', 'elektroauto'],
-      technologies: ['CAN Bus', 'AUTOSAR', 'V2X', 'Embedded Systems'],
-      regulations: ['ISO 26262', 'UNECE', 'Automotive SPICE'],
-      kpis: ['Fuel Efficiency', 'Safety Rating', 'Production Volume'],
-      focusAreas: ['Safety', 'Efficiency', 'Connectivity', 'Sustainability']
+      id: 'auto',
+      name: 'Automatische Erkennung',
+      icon: '🤖',
+      description: 'KI erkennt die Branche basierend auf Ihrem Text',
+      keywords: [],
+      technologies: [],
+      regulations: [],
+      kpis: [],
+      focusAreas: ['AI-basierte Erkennung', 'Vollautomatisch', 'Höchste Genauigkeit']
     },
     {
       id: 'ecommerce',
       name: 'E-Commerce & Retail',
       icon: '🛒',
       description: 'Online-Shops, Mobile Commerce, Payment-Systeme',
-      keywords: ['shop', 'ecommerce', 'online', 'retail', 'payment', 'checkout'],
-      technologies: ['React', 'Angular', 'Shopify', 'Magento', 'Stripe', 'PayPal'],
+      keywords: ['shop', 'ecommerce', 'payment', 'checkout'],
+      technologies: ['React', 'Angular', 'Shopify', 'Stripe', 'PayPal'],
       regulations: ['DSGVO', 'PCI-DSS', 'Cookie-Law'],
       kpis: ['Conversion Rate', 'AOV', 'CAC', 'LTV'],
       focusAreas: ['Mobile Experience', 'Payment Integration', 'Performance', 'SEO']
@@ -46,7 +54,7 @@ export class IndustryService {
       name: 'Gesundheitswesen',
       icon: '🏥',
       description: 'Krankenhäuser, Praxen, Medizintechnik',
-      keywords: ['gesundheit', 'krankenhaus', 'klinik', 'arzt', 'patient'],
+      keywords: ['gesundheit', 'krankenhaus', 'patient', 'medizin'],
       technologies: ['FHIR', 'HL7', 'DICOM', 'EMR', 'Telemedicine'],
       regulations: ['HIPAA', 'DSGVO', 'MDR', 'FDA'],
       kpis: ['Patient Satisfaction', 'Treatment Time', 'Error Rate'],
@@ -57,18 +65,29 @@ export class IndustryService {
       name: 'Finanzwesen',
       icon: '💰',
       description: 'Banking, Payment, Blockchain, Trading',
-      keywords: ['bank', 'finanz', 'payment', 'blockchain', 'trading'],
+      keywords: ['bank', 'finanz', 'payment', 'blockchain'],
       technologies: ['Blockchain', 'API', 'Real-time Processing', 'ML'],
       regulations: ['PCI-DSS', 'PSD2', 'GDPR', 'Basel III'],
       kpis: ['Transaction Volume', 'Fraud Rate', 'Customer Acquisition'],
       focusAreas: ['Security', 'Real-time Processing', 'Compliance', 'UX']
     },
     {
+      id: 'manufacturing',
+      name: 'Manufacturing & Industry 4.0',
+      icon: '🏭',
+      description: 'Produktion, IoT, Smart Factory, Automation',
+      keywords: ['manufacturing', 'iot', 'industry', 'automation'],
+      technologies: ['IoT', 'Predictive Analytics', 'Automation', 'Edge Computing'],
+      regulations: ['ISO 9001', 'ISO 14001', 'Industry 4.0'],
+      kpis: ['OEE', 'Downtime', 'Quality Score'],
+      focusAreas: ['IoT', 'Predictive Maintenance', 'Automation', 'Quality']
+    },
+    {
       id: 'it',
       name: 'IT/Software',
       icon: '💻',
       description: 'Software Development, IT Services, Digital Solutions',
-      keywords: ['software', 'entwicklung', 'it', 'digital', 'tech'],
+      keywords: ['software', 'entwicklung', 'it', 'digital'],
       technologies: ['Java', 'Python', 'React', 'Angular', 'Spring Boot', 'Docker'],
       regulations: ['ISO 27001', 'DSGVO', 'SOC 2'],
       kpis: ['Code Quality', 'Performance', 'Security Score'],
@@ -76,33 +95,87 @@ export class IndustryService {
     }
   ];
 
-  constructor(private apiService: ApiService) {}
-
-  getAllIndustries(): Industry[] {
-    return [...this.industries];
+  constructor(private apiService: ApiService) {
+    console.log('🏭 IndustryService initialized - Backend-Integration Fixed');
+    console.log('📋 UI Industries loaded:', this.uiIndustries.length);
   }
 
-  getIndustryById(id: string): Industry | undefined {
-    return this.industries.find(industry => industry.id === id);
+  // ===================================
+  // UI-DATEN (Lokale Hilfsmethoden für Frontend)
+  // ===================================
+
+  /**
+   * ✅ Alle Branchen für UI-Darstellung (lokal für Performance)
+   */
+  getAllIndustries(): Industry[] {
+    return [...this.uiIndustries];
   }
 
   /**
-   * Detect industry using backend service
+   * ✅ Branche nach ID für UI-Darstellung
+   */
+  getIndustryById(id: string): Industry | undefined {
+    return this.uiIndustries.find(industry => industry.id === id);
+  }
+
+  /**
+   * ✅ Branchen-spezifische UI-Daten abrufen
+   */
+  getIndustryFocusAreas(industryId: string): string[] {
+    const industry = this.getIndustryById(industryId);
+    return industry ? industry.focusAreas : [];
+  }
+
+  getIndustryRegulations(industryId: string): string[] {
+    const industry = this.getIndustryById(industryId);
+    return industry ? industry.regulations : [];
+  }
+
+  getIndustryKPIs(industryId: string): string[] {
+    const industry = this.getIndustryById(industryId);
+    return industry ? industry.kpis : [];
+  }
+
+  getIndustryTechnologies(industryId: string): string[] {
+    const industry = this.getIndustryById(industryId);
+    return industry ? industry.technologies : [];
+  }
+
+  // ===================================
+  // BACKEND-DELEGATION (KORRIGIERT)
+  // ===================================
+
+  /**
+   * ✅ KORRIGIERT: Branchenerkennung - Backend-Integration Fixed
    */
   detectIndustry(text: string): Observable<{ industry: Industry; confidence: number }> {
+    console.log('📄 IndustryService: detectIndustry → Backend AI Service');
+    console.log('📝 Text length:', text.length);
+    
     return this.apiService.detectIndustry(text).pipe(
-      map((result: IndustryAnalysisResult) => {
-        // Map backend industry name to our local industry
-        const detectedIndustry = this.mapBackendIndustryToLocal(result.primaryIndustry);
+      map((result: IndustryDetectionResponse) => {
+        console.log('✅ Backend industry detection:', result.primaryIndustry, '(' + result.confidence + '%)');
+        
+        // ✅ KORRIGIERT: Mappe Backend-Ergebnis zu lokaler UI-Struktur
+        const detectedIndustry = this.mapBackendIndustryToLocal(result.primaryIndustry) 
+          || this.getDefaultIndustry();
+        
         return {
-          industry: detectedIndustry || this.getDefaultIndustry(),
+          industry: detectedIndustry,
           confidence: result.confidence
         };
       }),
+      tap(result => {
+        console.log('🎯 Mapped industry:', result.industry.name, 'confidence:', result.confidence);
+        console.log('🔍 Detection method: Backend AI Service');
+      }),
       catchError(error => {
-        console.warn('Backend industry detection failed, using fallback:', error);
+        console.warn('⚠️ Backend industry detection failed:', error.message);
+        console.log('🔄 Using fallback: IT/Software');
+        
+        // Fallback auf IT/Software bei Backend-Fehler
         return of({
-          industry: this.detectIndustryLocal(text),
+          industry: this.getIndustryById('it') || this.getDefaultIndustry(),
           confidence: 50
         });
       })
@@ -110,275 +183,239 @@ export class IndustryService {
   }
 
   /**
-   * Get supported industries from backend
+   * ✅ KORRIGIERT: Unterstützte Branchen vom Backend abrufen
    */
   getSupportedIndustries(): Observable<any> {
+    console.log('📄 IndustryService: getSupportedIndustries → Backend AI Service');
+    
     return this.apiService.getSupportedIndustries().pipe(
+      tap(industries => {
+        console.log('✅ Backend industries loaded:', Object.keys(industries.industries || {}).length);
+      }),
       catchError(error => {
-        console.warn('Could not fetch backend industries, using local ones');
-        return of({
-          industries: this.industries.reduce((acc, ind) => {
+        console.warn('⚠️ Could not fetch backend industries, using local ones');
+        
+        // Fallback auf lokale Branchen
+        const fallback = {
+          industries: this.uiIndustries.reduce((acc, ind) => {
             acc[ind.id] = ind.keywords.join(', ');
             return acc;
-          }, {} as any)
-        });
+          }, {} as any),
+          message: 'Using local industry definitions',
+          fallback: true
+        };
+        
+        return of(fallback);
       })
     );
   }
 
   /**
-   * Comprehensive analysis with industry detection
+   * ✅ KORRIGIERT: Text-Analyse mit Branchenerkennung
    */
   analyzeText(text: string, selectedIndustryId?: string): Observable<any> {
+    console.log('📄 IndustryService: analyzeText → Backend Comprehensive Analysis');
+    
     if (selectedIndustryId && selectedIndustryId !== 'auto') {
-      // Use selected industry for analysis
+      console.log('🎯 User selected industry:', selectedIndustryId);
+      
+      // Bei manueller Auswahl: Comprehensive Analysis mit Kontext
       const industry = this.getIndustryById(selectedIndustryId);
-      return of(this.createAnalysisResult(text, industry!, 95));
-    } else {
-      // Auto-detect industry
-      return this.detectIndustry(text).pipe(
-        map(result => this.createAnalysisResult(text, result.industry, result.confidence))
+      return this.apiService.comprehensiveAnalysis(text).pipe(
+        map(result => ({
+          ...result,
+          detectedIndustry: {
+            id: selectedIndustryId,
+            name: industry?.name || selectedIndustryId,
+            description: industry?.description || 'Manuell ausgewählt'
+          },
+          confidence: 95, // Hohe Konfidenz bei manueller Auswahl
+          selectionMode: 'manual'
+        }))
       );
+    } else {
+      console.log('🤖 Auto-detect industry mode');
+      // Auto-Erkennung: Vollständige Backend-Analyse
+      return this.apiService.comprehensiveAnalysis(text);
     }
   }
 
-  // =============================================
-  // PRIVATE HELPER METHODS
-  // =============================================
+  // ===================================
+  // MAPPING & HELPER METHODEN (KORRIGIERT)
+  // ===================================
 
+  /**
+   * ✅ KORRIGIERT: Mappe Backend-Branche zu lokaler UI-Struktur
+   */
   private mapBackendIndustryToLocal(backendIndustry: string): Industry | undefined {
+    console.log('🔄 Mapping backend industry:', backendIndustry);
+    
+    // ✅ ERWEITERT: Mehr Backend-zu-Frontend Mappings
     const mappings: { [key: string]: string } = {
-      'Automotive': 'automotive',
+      // Direkte Mappings
       'E-Commerce': 'ecommerce',
+      'ecommerce': 'ecommerce',
+      'E-Commerce & Retail': 'ecommerce',
+      'Online-Handel': 'ecommerce',
+      
       'Gesundheitswesen': 'healthcare',
+      'healthcare': 'healthcare',
+      'Medizin': 'healthcare',
+      'Healthcare': 'healthcare',
+      
       'Finanzwesen': 'fintech',
-      'IT/Software': 'it'
+      'fintech': 'fintech',
+      'Banking': 'fintech',
+      'Finance': 'fintech',
+      
+      'Manufacturing': 'manufacturing',
+      'Produktion': 'manufacturing',
+      'Industry 4.0': 'manufacturing',
+      'Industrie': 'manufacturing',
+      
+      'IT/Software': 'it',
+      'Software': 'it',
+      'Technologie': 'it',
+      'Technology': 'it',
+      'IT': 'it',
+      
+      // Fallback-Mappings
+      'Automotive': 'manufacturing',
+      'Transport': 'logistics',
+      'Logistik': 'logistics',
+      'Bildung': 'it',
+      'Education': 'it',
+      'Event': 'it',
+      'Marketing': 'it'
     };
 
     const localId = mappings[backendIndustry] || backendIndustry.toLowerCase();
-    return this.getIndustryById(localId);
+    const mappedIndustry = this.getIndustryById(localId);
+    
+    console.log('🎯 Mapped to local industry:', mappedIndustry?.name || 'Not found');
+    
+    return mappedIndustry;
   }
 
+  /**
+   * ✅ Standard-Branche bei Fehlern
+   */
   private getDefaultIndustry(): Industry {
-    return this.industries[0]; // Return first industry as default
+    return this.getIndustryById('it') || this.uiIndustries[0];
   }
 
-  private detectIndustryLocal(text: string): Industry {
-    // Fallback local detection
-    const industryScores: { [key: string]: number } = {};
-    
-    this.industries.forEach(industry => {
-      let score = 0;
-      industry.keywords.forEach(keyword => {
-        const regex = new RegExp(`\\b${keyword}\\b`, 'gi');
-        const matches = text.match(regex);
-        if (matches) {
-          score += matches.length;
-        }
-      });
-      industryScores[industry.id] = score;
-    });
+  /**
+   * ✅ Branche mit Fallback
+   */
+  getIndustryWithFallback(id: string): Industry {
+    return this.getIndustryById(id) || this.getDefaultIndustry();
+  }
 
-    const bestIndustryId = Object.keys(industryScores).reduce((a, b) => 
-      industryScores[a] > industryScores[b] ? a : b
+  /**
+   * ✅ Konfidenz-Level kategorisieren
+   */
+  getConfidenceLevel(confidence: number): 'low' | 'medium' | 'high' {
+    if (confidence >= 80) return 'high';
+    if (confidence >= 60) return 'medium';
+    return 'low';
+  }
+
+  /**
+   * ✅ Konfidenz-Beschreibung für UI
+   */
+  getConfidenceDescription(confidence: number): string {
+    const level = this.getConfidenceLevel(confidence);
+    
+    switch (level) {
+      case 'high':
+        return 'Sehr zuverlässige Erkennung';
+      case 'medium':
+        return 'Gute Erkennung, manuelle Überprüfung empfohlen';
+      case 'low':
+        return 'Unsichere Erkennung, manuelle Auswahl empfohlen';
+      default:
+        return 'Unbekannte Konfidenz';
+    }
+  }
+
+  /**
+   * ✅ Text-Länge für Branchenerkennung validieren
+   */
+  validateTextForIndustryDetection(text: string): { valid: boolean; message?: string } {
+    if (!text || text.trim().length === 0) {
+      return { valid: false, message: 'Text für Branchenerkennung darf nicht leer sein' };
+    }
+    
+    if (text.length < 50) {
+      return { valid: false, message: 'Text zu kurz für zuverlässige Branchenerkennung (min. 50 Zeichen)' };
+    }
+    
+    if (text.length > 50000) {
+      return { valid: false, message: 'Text zu lang für Branchenerkennung (max. 50.000 Zeichen)' };
+    }
+    
+    return { valid: true };
+  }
+
+  // ===================================
+  // TEST & DEBUG METHODEN (NEU)
+  // ===================================
+
+  /**
+   * ✅ NEU: Test Branchenerkennung mit Debug-Output
+   */
+  testIndustryDetection(text: string): Observable<any> {
+    console.group('🧪 Industry Detection Test');
+    console.log('📝 Input text:', text.substring(0, 100) + '...');
+    console.log('📏 Text length:', text.length);
+    
+    return this.apiService.testIndustryDetection(text).pipe(
+      tap(result => {
+        console.log('✅ Test result:', result);
+        console.groupEnd();
+      }),
+      catchError(error => {
+        console.error('❌ Test failed:', error);
+        console.groupEnd();
+        throw error;
+      })
     );
+  }
+
+  /**
+   * ✅ NEU: Debug Industry Mapping
+   */
+  debugIndustryMapping(backendIndustry: string): void {
+    console.group('🔍 Industry Mapping Debug');
+    console.log('🔤 Backend Industry:', backendIndustry);
     
-    return this.getIndustryById(bestIndustryId) || this.getDefaultIndustry();
-  }
-
-  private createAnalysisResult(text: string, industry: Industry, confidence: number): any {
-    // Create comprehensive analysis result
-    const keywords = this.extractKeywords(text, industry);
-    const recommendations = this.generateRecommendations(text, industry);
+    const mapped = this.mapBackendIndustryToLocal(backendIndustry);
+    console.log('🎯 Mapped to:', mapped?.name || 'No mapping found');
+    console.log('📋 Available industries:', this.uiIndustries.map(i => i.id));
     
-    return {
-      detectedIndustry: {
-        id: industry.id,
-        name: industry.name,
-        description: industry.description
-      },
-      confidence,
-      summary: this.generateSummary(text, industry),
-      technologyKeywords: keywords.technology,
-      businessKeywords: keywords.business,
-      complianceKeywords: keywords.compliance,
-      highPriorityRecommendations: recommendations.high,
-      mediumPriorityRecommendations: recommendations.medium,
-      lowPriorityRecommendations: recommendations.low,
-      estimatedBudget: this.estimateBudget(text, industry),
-      timeline: this.estimateTimeline(text, industry),
-      recommendedStack: this.recommendTechStack(text, industry),
-      successMetrics: this.defineSuccessMetrics(text, industry),
-      complianceResults: this.analyzeCompliance(text, industry),
-      riskAssessment: this.calculateRisk(text, industry)
-    };
-  }
-
-  private extractKeywords(text: string, industry: Industry) {
-    const technology: string[] = [];
-    const business: string[] = [];
-    const compliance: string[] = [];
-
-    // Extract based on industry context
-    industry.technologies.forEach(tech => {
-      if (new RegExp(`\\b${tech}\\b`, 'gi').test(text)) {
-        technology.push(tech);
-      }
-    });
-
-    industry.keywords.forEach(keyword => {
-      if (new RegExp(`\\b${keyword}\\b`, 'gi').test(text)) {
-        business.push(keyword);
-      }
-    });
-
-    industry.regulations.forEach(reg => {
-      if (new RegExp(`\\b${reg}\\b`, 'gi').test(text)) {
-        compliance.push(reg);
-      }
-    });
-
-    return { technology, business, compliance };
-  }
-
-  private generateRecommendations(text: string, industry: Industry) {
-    const high: string[] = [];
-    const medium: string[] = [];
-    const low: string[] = [];
-
-    // Industry-specific recommendations
-    switch (industry.id) {
-      case 'ecommerce':
-        high.push('Progressive Web App für bessere Mobile Experience');
-        high.push('Payment Gateway Integration (Stripe, PayPal)');
-        medium.push('A/B Testing Framework für Conversion-Optimierung');
-        low.push('Personalisierte Produktempfehlungen');
-        break;
-      case 'healthcare':
-        high.push('FHIR-konforme Datenstrukturen');
-        high.push('End-to-End Verschlüsselung für Patientendaten');
-        medium.push('Audit Logging für Compliance');
-        low.push('Telemedicine Integration');
-        break;
-      case 'fintech':
-        high.push('PCI-DSS Level 1 Compliance');
-        high.push('Real-time Fraud Detection');
-        medium.push('Strong Customer Authentication (SCA)');
-        low.push('Blockchain Integration für Transparenz');
-        break;
+    if (!mapped) {
+      console.warn('⚠️ No mapping found for:', backendIndustry);
+      console.log('💡 Consider adding mapping or using fallback');
     }
-
-    return { all: [...high, ...medium, ...low], high, medium, low };
-  }
-
-  private generateSummary(text: string, industry: Industry): string {
-    const firstLines = text.split('\n').slice(0, 3).join(' ').substring(0, 200);
-    return `${industry.name}-Projekt: ${firstLines}... [Analysiert mit branchenspezifischer KI]`;
-  }
-
-  private estimateBudget(text: string, industry: Industry) {
-    const baseAmount = 100000;
-    const multipliers: { [key: string]: number } = {
-      'automotive': 2.0,
-      'healthcare': 1.8,
-      'fintech': 2.2,
-      'ecommerce': 1.0,
-      'it': 1.2
-    };
     
-    const multiplier = multipliers[industry.id] || 1.0;
-    const complexity = Math.min(3, 1 + (text.length / 10000));
-    const estimated = baseAmount * complexity * multiplier;
+    console.groupEnd();
+  }
+
+  /**
+   * ✅ NEU: Validate Backend Integration
+   */
+  validateBackendIntegration(): Observable<boolean> {
+    console.log('🔍 Validating backend integration...');
     
-    return {
-      min: Math.round(estimated * 0.8),
-      max: Math.round(estimated * 1.3),
-      confidence: 'medium' as const,
-      factors: [
-        `Branche: ${industry.name} (${multiplier}x)`,
-        `Komplexität: ${complexity.toFixed(1)}x`,
-        'Compliance-Anforderungen berücksichtigt'
-      ]
-    };
-  }
-
-  private estimateTimeline(text: string, industry: Industry) {
-    const baseTimelines: { [key: string]: number } = {
-      'automotive': 18,
-      'healthcare': 12,
-      'fintech': 15,
-      'ecommerce': 6,
-      'it': 8
-    };
-    
-    const baseMonths = baseTimelines[industry.id] || 6;
-    const complexity = Math.min(2, 1 + (text.length / 15000));
-    
-    return {
-      estimated: Math.round(baseMonths * complexity),
-      phases: [
-        { name: 'Discovery & Planning', duration: 1, dependencies: [], deliverables: ['Requirements'] },
-        { name: 'Core Development', duration: 3, dependencies: ['Discovery'], deliverables: ['MVP'] },
-        { name: 'Testing & Launch', duration: 2, dependencies: ['Core Development'], deliverables: ['Go-Live'] }
-      ],
-      criticalPath: ['Requirements Analysis', 'Core Development', 'Testing', 'Go-Live']
-    };
-  }
-
-  private recommendTechStack(text: string, industry: Industry) {
-    const base = {
-      frontend: ['React', 'TypeScript'],
-      backend: ['Node.js', 'Express'],
-      database: ['PostgreSQL'],
-      infrastructure: ['Docker', 'AWS']
-    };
-
-    // Industry-specific additions
-    if (industry.technologies) {
-      base.frontend.push(...industry.technologies.filter(t => 
-        ['React', 'Angular', 'Vue'].some(f => t.includes(f))
-      ));
-      base.backend.push(...industry.technologies.filter(t => 
-        ['Spring', 'Express', 'Django'].some(b => t.includes(b))
-      ));
-    }
-
-    return base;
-  }
-
-  private defineSuccessMetrics(text: string, industry: Industry) {
-    return industry.kpis.map(kpi => ({
-      name: kpi,
-      current: 'TBD',
-      target: 'To be defined',
-      improvement: '+25%'
-    }));
-  }
-
-  private analyzeCompliance(text: string, industry: Industry) {
-    return industry.regulations.map(regulation => ({
-      regulation,
-      relevance: text.toLowerCase().includes(regulation.toLowerCase()) ? 'high' : 'medium',
-      foundKeywords: industry.keywords.filter(k => text.toLowerCase().includes(k)),
-      requirements: [`${regulation} compliance required`, 'Documentation needed'],
-      riskLevel: 'medium' as const
-    }));
-  }
-
-  private calculateRisk(text: string, industry: Industry) {
-    const baseRisk = 5;
-    const securityRisk = industry.id === 'fintech' || industry.id === 'healthcare' ? 7 : 4;
-    const complianceRisk = industry.regulations.length > 2 ? 6 : 3;
-    
-    return {
-      overall: Math.max(baseRisk, securityRisk, complianceRisk),
-      security: securityRisk,
-      compliance: complianceRisk,
-      technical: 4,
-      recommendations: [
-        'Security Audit durch externes Unternehmen',
-        'Compliance-Beratung durch Rechtsexperten'
-      ]
-    };
+    return this.apiService.checkAiHealth().pipe(
+      map(health => {
+        console.log('✅ Backend AI Service healthy:', health);
+        return true;
+      }),
+      catchError(error => {
+        console.error('❌ Backend AI Service not available:', error.message);
+        return of(false);
+      })
+    );
   }
 }

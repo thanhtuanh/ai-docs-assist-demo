@@ -1,17 +1,19 @@
+// src/app/document-upload/document-upload.component.ts
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { finalize } from 'rxjs/operators';
+import { ActivatedRoute, Router } from '@angular/router';
+import { finalize, switchMap } from 'rxjs/operators';
 import { ApiService, AnalysisOptions } from '../services/api.service';
 import { IndustryService } from '../services/industry.service';
 import { FeedbackService, AnalysisFeedback } from '../feedback.service';
 
 interface EnhancedAnalysisResult {
-  // Core fields from backend
+  // Backend Response Structure (exakt wie DocumentController.java)
   document?: any;
   message?: string;
   metadata?: { [key: string]: any };
   processingTimeMs?: number;
   
-  // Industry analysis fields
+  // Industry analysis (von AI Service)
   detectedIndustry?: {
     id: string;
     name: string;
@@ -19,7 +21,7 @@ interface EnhancedAnalysisResult {
   };
   confidence?: number;
   
-  // Categorized analysis
+  // Processed analysis data
   summary?: string;
   technologyKeywords?: string[];
   businessKeywords?: string[];
@@ -30,7 +32,7 @@ interface EnhancedAnalysisResult {
   mediumPriorityRecommendations?: string[];
   lowPriorityRecommendations?: string[];
   
-  // Additional analysis
+  // Additional analysis (falls vom Backend geliefert)
   estimatedBudget?: any;
   timeline?: any;
   recommendedStack?: any;
@@ -47,7 +49,7 @@ interface EnhancedAnalysisResult {
 export class DocumentUploadComponent implements OnInit {
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
-  // File and text handling
+  // Component State
   selectedFile: File | null = null;
   textInput: string = '';
   isDragOver: boolean = false;
@@ -76,563 +78,176 @@ export class DocumentUploadComponent implements OnInit {
   };
   currentPlan: 'free' | 'premium' | 'enterprise' = 'free';
 
-  // Analysis options
-  analysisOptions: AnalysisOptions = {
-    generateSummary: true,
-    extractKeywords: true,
-    suggestComponents: true,
-    performSentimentAnalysis: false,
-    detectLanguage: true,
-    calculateMetrics: true
+  // Route-based modes
+  isHealthCheckMode: boolean = false;
+  isDemoMode: boolean = false;
+  demoIndustry: string | null = null;
+  isNotFoundMode: boolean = false;
+  
+  // Backend status
+  backendStatus: {
+    available: boolean;
+    aiServiceStatus: string;
+    lastCheck: Date | null;
+    errorDetails: string | null;
+  } = {
+    available: false,
+    aiServiceStatus: 'unknown',
+    lastCheck: null,
+    errorDetails: null
   };
 
   constructor(
     private apiService: ApiService,
     private industryService: IndustryService,
-    private feedbackService: FeedbackService
-  ) {}
+    private feedbackService: FeedbackService,
+    private route: ActivatedRoute,
+    private router: Router
+  ) {
+    console.log('📋 DocumentUploadComponent initialized - Pure Backend-Only Mode');
+  }
 
   ngOnInit(): void {
+    this.initializeRouteBasedMode();
     this.loadIndustries();
-    this.checkBackendHealth();
+    this.checkBackendAvailability();
+    this.handleQueryParameters();
   }
 
-  // =============================================
-  // INITIALIZATION METHODS
-  // =============================================
+  // ===================================
+  // FEHLENDE METHODEN HINZUFÜGEN
+  // ===================================
 
-  private loadIndustries(): void {
-    this.industries = this.industryService.getAllIndustries();
-    
-    // Also load from backend if available
-    this.industryService.getSupportedIndustries().subscribe({
-      next: (backendIndustries) => {
-        console.log('✅ Backend industries loaded:', backendIndustries);
-        // Could merge or update local industries here
-      },
-      error: (error) => {
-        console.warn('⚠️ Could not load backend industries, using local ones');
-      }
-    });
+  /**
+   * ✅ Branchenerkennung abrufen - Fokus-Bereiche
+   */
+  getIndustryFocusAreas(industryId: string): string[] {
+    return this.industryService.getIndustryFocusAreas(industryId);
   }
 
-  private checkBackendHealth(): void {
-    this.apiService.checkAiHealth().subscribe({
-      next: (health) => {
-        console.log('✅ AI Service Health:', health);
-      },
-      error: (error) => {
-        console.warn('⚠️ AI Service not available:', error);
-      }
-    });
+  /**
+   * ✅ Branchenerkennung abrufen - Regulierungen
+   */
+  getIndustryRegulations(industryId: string): string[] {
+    return this.industryService.getIndustryRegulations(industryId);
   }
 
-  // =============================================
-  // ANALYSIS METHODS
-  // =============================================
-
-  async analyzeDocument(): Promise<void> {
-    if (!this.selectedFile || this.isAnalyzing) return;
-    
-    this.isAnalyzing = true;
-    this.clearResults();
-    console.log('📄 Starting document analysis...');
-
-    // Enhanced analysis options
-    const options: AnalysisOptions = {
-      ...this.analysisOptions,
-      performSentimentAnalysis: true,
-      calculateMetrics: true
-    };
-
-    this.apiService.analyzeDocument(this.selectedFile, options)
-      .pipe(finalize(() => this.isAnalyzing = false))
-      .subscribe({
-        next: (result) => {
-          console.log('✅ Document analysis completed:', result);
-          this.handleAnalysisSuccess(result);
-        },
-        error: (error) => {
-          console.error('❌ Document analysis failed:', error);
-          this.handleAnalysisError(error);
-        }
-      });
+  /**
+   * ✅ Branchenerkennung abrufen - KPIs
+   */
+  getIndustryKPIs(industryId: string): string[] {
+    return this.industryService.getIndustryKPIs(industryId);
   }
 
-  async analyzeText(): Promise<void> {
-    if (!this.textInput.trim() || this.isAnalyzing || this.isTextTooLong()) return;
-    
-    this.isAnalyzing = true;
-    this.clearResults();
-    console.log('📝 Starting text analysis...');
-
-    const request = {
-      text: this.textInput,
-      title: this.selectedIndustry === 'auto' ? 'Text Analysis' : `${this.getIndustryName(this.selectedIndustry)} Analysis`,
-      saveDocument: true,
-      options: {
-        ...this.analysisOptions,
-        performSentimentAnalysis: true,
-        calculateMetrics: true
-      }
-    };
-
-    this.apiService.analyzeText(request)
-      .pipe(finalize(() => this.isAnalyzing = false))
-      .subscribe({
-        next: (result) => {
-          console.log('✅ Text analysis completed:', result);
-          this.handleAnalysisSuccess(result);
-        },
-        error: (error) => {
-          console.error('❌ Text analysis failed:', error);
-          this.handleAnalysisError(error);
-        }
-      });
+  /**
+   * ✅ Branche auswählen
+   */
+  setIndustry(industryId: string): void {
+    this.selectedIndustry = industryId;
+    console.log('🎯 Industry selected:', industryId);
   }
 
-  // Enhanced analysis with industry detection
-  analyzeWithIndustryDetection(): void {
-    if (!this.textInput.trim() || this.isAnalyzing) return;
-    
-    this.isAnalyzing = true;
-    this.clearResults();
-    console.log('🏭 Starting analysis with industry detection...');
-
-    // First detect industry
-    this.apiService.detectIndustry(this.textInput)
-      .pipe(finalize(() => this.isAnalyzing = false))
-      .subscribe({
-        next: (industryResult) => {
-          console.log('🏭 Industry detected:', industryResult);
-          
-          // Then perform comprehensive analysis
-          this.apiService.comprehensiveAnalysis(this.textInput).subscribe({
-            next: (analysisResult) => {
-              // Combine results
-              const combined = {
-                ...analysisResult,
-                detectedIndustry: {
-                  id: industryResult.primaryIndustry.toLowerCase(),
-                  name: industryResult.primaryIndustry,
-                  description: `Auto-detected: ${industryResult.primaryIndustry}`
-                },
-                confidence: industryResult.confidence
-              };
-              this.handleAnalysisSuccess(combined);
-            },
-            error: (error) => this.handleAnalysisError(error)
-          });
-        },
-        error: (error) => {
-          console.warn('Industry detection failed, using regular analysis');
-          this.analyzeText();
-        }
-      });
+  /**
+   * ✅ Branchennamen abrufen
+   */
+  getIndustryName(industryId: string): string {
+    const industry = this.industryService.getIndustryById(industryId);
+    return industry ? industry.name : 'Unbekannte Branche';
   }
 
-  // =============================================
-  // RESULT HANDLING
-  // =============================================
-
-  private handleAnalysisSuccess(result: any): void {
-    console.log('🎉 Analysis successful:', result);
-    
-    // Normalize the result structure
-    this.analysisResult = this.normalizeAnalysisResult(result);
-    
-    // Update selected industry if auto-detected
-    if (this.selectedIndustry === 'auto' && this.analysisResult?.detectedIndustry) {
-      this.selectedIndustry = this.analysisResult.detectedIndustry.id;
-    }
-    
-    // Show feedback option
-    this.analysisId = this.generateAnalysisId();
-    this.showFeedback = true;
-    this.feedbackSubmitted = false;
-    
-    console.log('✅ Analysis result processed and ready for display');
-  }
-
-  private handleAnalysisError(error: any): void {
-    console.error('💥 Analysis error:', error);
-    this.errorMessage = error.message || 'Ein Fehler ist bei der Analyse aufgetreten';
-    this.analysisResult = null;
-  }
-
-  private normalizeAnalysisResult(result: any): EnhancedAnalysisResult {
-    console.log('📄 Normalizing analysis result...');
-    console.log('🔍 Raw backend result:', result);
-    
-    // Handle different response structures from different endpoints
-    let normalized: EnhancedAnalysisResult = {};
-    
-    // From /api/documents endpoints
-    if (result.document) {
-      const doc = result.document;
-      normalized = {
-        document: doc,
-        message: result.message,
-        metadata: result.metadata,
-        processingTimeMs: result.processingTimeMs,
-        summary: doc.summary,
-        detectedIndustry: {
-          id: doc.documentType?.toLowerCase() || 'ecommerce',
-          name: doc.documentType || 'E-Commerce',
-          description: doc.documentType || 'Document type not specified'
-        },
-        confidence: doc.qualityScore || 50
-      };
-      
-      // Parse keywords if they're comma-separated strings
-      if (doc.keywords) {
-        const keywords = doc.keywords.split(',').map((k: string) => k.trim());
-        normalized.technologyKeywords = keywords.filter((k: string) => this.isTechnicalTerm(k));
-        normalized.businessKeywords = keywords.filter((k: string) => !this.isTechnicalTerm(k));
-        normalized.complianceKeywords = [];
-      }
-      
-      // Parse recommendations
-      if (doc.recommendations) {
-        const recs = doc.recommendations.split('\n').filter((r: string) => r.trim());
-        normalized.highPriorityRecommendations = recs.slice(0, 3);
-        normalized.mediumPriorityRecommendations = recs.slice(3, 6);
-        normalized.lowPriorityRecommendations = recs.slice(6);
-      }
-    }
-    
-    // From /api/ai endpoints
-    if (result.industryAnalysis) {
-      const industry = result.industryAnalysis;
-      normalized.detectedIndustry = {
-        id: industry.primaryIndustry?.toLowerCase() || 'unknown',
-        name: industry.primaryIndustry || 'Unknown',
-        description: `Detected with ${industry.confidence}% confidence`
-      };
-      normalized.confidence = industry.confidence;
-    }
-    
-    // From industry service local analysis
-    if (result.detectedIndustry && !normalized.detectedIndustry) {
-      normalized.detectedIndustry = result.detectedIndustry;
-      normalized.confidence = result.confidence;
-      normalized.summary = result.summary;
-      normalized.technologyKeywords = result.technologyKeywords || [];
-      normalized.businessKeywords = result.businessKeywords || [];
-      normalized.complianceKeywords = result.complianceKeywords || [];
-      normalized.highPriorityRecommendations = result.highPriorityRecommendations || [];
-      normalized.mediumPriorityRecommendations = result.mediumPriorityRecommendations || [];
-      normalized.lowPriorityRecommendations = result.lowPriorityRecommendations || [];
-      normalized.estimatedBudget = result.estimatedBudget;
-      normalized.timeline = result.timeline;
-      normalized.recommendedStack = result.recommendedStack;
-      normalized.successMetrics = result.successMetrics || [];
-      normalized.complianceResults = result.complianceResults || [];
-      normalized.riskAssessment = result.riskAssessment;
-    }
-    
-    // 🆕 Fallback to local analysis if backend gives minimal data
-    if (!normalized.summary || (!normalized.technologyKeywords || normalized.technologyKeywords.length === 0)) {
-      console.log('🔄 Backend analysis incomplete, using local fallback analysis...');
-      const localAnalysis = this.performLocalAnalysis(this.textInput);
-      
-      // Use backend summary if available, otherwise local
-      if (!normalized.summary) {
-        normalized.summary = localAnalysis.summary;
-      }
-      
-      // Use local keyword extraction if backend didn't provide any
-      if (!normalized.technologyKeywords || normalized.technologyKeywords.length === 0) {
-        normalized.technologyKeywords = localAnalysis.technologyKeywords;
-        normalized.businessKeywords = localAnalysis.businessKeywords;
-        normalized.complianceKeywords = localAnalysis.complianceKeywords;
-      }
-      
-      // Use local recommendations if none provided
-      if (!normalized.highPriorityRecommendations || normalized.highPriorityRecommendations.length === 0) {
-        normalized.highPriorityRecommendations = localAnalysis.highPriorityRecommendations;
-        normalized.mediumPriorityRecommendations = localAnalysis.mediumPriorityRecommendations;
-        normalized.lowPriorityRecommendations = localAnalysis.lowPriorityRecommendations;
-      }
-      
-      // Set estimated budget and timeline
-      normalized.estimatedBudget = localAnalysis.estimatedBudget;
-      normalized.timeline = localAnalysis.timeline;
-      normalized.recommendedStack = localAnalysis.recommendedStack;
-      normalized.successMetrics = localAnalysis.successMetrics;
-      normalized.complianceResults = localAnalysis.complianceResults;
-      normalized.riskAssessment = localAnalysis.riskAssessment;
-    }
-    
-    // Fallback for minimal results
-    if (!normalized.detectedIndustry) {
-      // Try to detect industry from text
-      const detectedIndustry = this.detectIndustryFromText(this.textInput);
-      normalized.detectedIndustry = {
-        id: detectedIndustry.id,
-        name: detectedIndustry.name,
-        description: detectedIndustry.description
-      };
-      normalized.confidence = detectedIndustry.confidence;
-    }
-    
-    // Ensure arrays are initialized
-    if (!normalized.technologyKeywords) normalized.technologyKeywords = [];
-    if (!normalized.businessKeywords) normalized.businessKeywords = [];
-    if (!normalized.complianceKeywords) normalized.complianceKeywords = [];
-    if (!normalized.highPriorityRecommendations) normalized.highPriorityRecommendations = [];
-    if (!normalized.mediumPriorityRecommendations) normalized.mediumPriorityRecommendations = [];
-    if (!normalized.lowPriorityRecommendations) normalized.lowPriorityRecommendations = [];
-    
-    if (!normalized.summary && result.textAnalysis) {
-      normalized.summary = result.textAnalysis.summary || 'Analysis completed successfully';
-    }
-    
-    console.log('✅ Analysis result normalized:', normalized);
-    return normalized;
-  }
-
-  // =============================================
-  // FILE HANDLING METHODS
-  // =============================================
-
+  /**
+   * ✅ Dateibereich anklicken
+   */
   onFileAreaClick(): void {
-    this.fileInput.nativeElement.click();
-  }
-
-  onFileSelected(event: Event): void {
-    const target = event.target as HTMLInputElement;
-    const files = target.files;
-    if (files && files.length > 0) {
-      this.selectedFile = files[0];
-      this.clearResults();
-      this.validateFile();
+    if (this.fileInput) {
+      this.fileInput.nativeElement.click();
     }
   }
 
+  /**
+   * ✅ Drag Over Event
+   */
   onDragOver(event: DragEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.isDragOver = true;
   }
 
+  /**
+   * ✅ Drag Leave Event
+   */
   onDragLeave(event: DragEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.isDragOver = false;
   }
 
+  /**
+   * ✅ File Drop Event
+   */
   onFileDrop(event: DragEvent): void {
     event.preventDefault();
+    event.stopPropagation();
     this.isDragOver = false;
-    
+
     const files = event.dataTransfer?.files;
     if (files && files.length > 0) {
       this.selectedFile = files[0];
-      this.clearResults();
-      this.validateFile();
+      console.log('📁 File dropped:', this.selectedFile.name);
     }
   }
 
+  /**
+   * ✅ Datei entfernen
+   */
   removeFile(): void {
     this.selectedFile = null;
-    this.fileInput.nativeElement.value = '';
-    this.clearResults();
-  }
-
-  private validateFile(): void {
-    if (!this.selectedFile) return;
-    
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'text/plain',
-      'text/csv',
-      'application/json',
-      'text/markdown'
-    ];
-    
-    if (!allowedTypes.includes(this.selectedFile.type)) {
-      this.errorMessage = 'Unsupported file type. Supported: PDF, DOC, DOCX, TXT, CSV, JSON, MD';
-      this.removeFile();
-      return;
-    }
-    
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (this.selectedFile.size > maxSize) {
-      this.errorMessage = 'File too large. Maximum size is 10MB.';
-      this.removeFile();
-      return;
-    }
-    
-    this.errorMessage = '';
-  }
-
-  getFileSize(bytes: number): string {
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 Bytes';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
-  }
-
-  // =============================================
-  // INDUSTRY METHODS
-  // =============================================
-
-  setIndustry(industryId: string): void {
-    this.selectedIndustry = industryId;
-    this.clearResults();
-    console.log('🏭 Industry selected:', industryId);
-  }
-
-  getIndustryName(industryId: string): string {
-    if (industryId === 'auto') return 'Automatische Erkennung';
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.name : 'Unknown Industry';
-  }
-
-  getIndustryFocusAreas(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.focusAreas : [];
-  }
-
-  getIndustryRegulations(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.regulations : [];
-  }
-
-  getIndustryKPIs(industryId: string): string[] {
-    const industry = this.industryService.getIndustryById(industryId);
-    return industry ? industry.kpis : [];
-  }
-
-  // =============================================
-  // TEXT INPUT METHODS
-  // =============================================
-
-  loadDemoText(industryType?: string): void {
-    const demoType = industryType || 'ecommerce';
-    this.textInput = this.getDemoTextByIndustry(demoType);
-    
-    if (industryType) {
-      this.selectedIndustry = industryType;
-    }
-    
-    this.clearResults();
-  }
-
-  private getDemoTextByIndustry(industryType: string): string {
-    const demoTexts: { [key: string]: string } = {
-      'ecommerce': this.getEcommerceDemoText(),
-      'healthcare': this.getHealthcareDemoText(),
-      'fintech': this.getFintechDemoText(),
-      'manufacturing': this.getManufacturingDemoText()
-    };
-    
-    return demoTexts[industryType] || demoTexts['ecommerce'];
-  }
-
-  getTextLimit(): number {
-    return this.textLimits[this.currentPlan];
-  }
-
-  isTextTooLong(): boolean {
-    return this.textInput.length > this.getTextLimit();
-  }
-
-  formatNumber(num: number): string {
-    return new Intl.NumberFormat('de-DE').format(num);
-  }
-
-  // =============================================
-  // FEEDBACK METHODS
-  // =============================================
-
-  setFeedbackRating(rating: number): void {
-    this.feedbackRating = rating;
-  }
-
-  async submitFeedback(): Promise<void> {
-    if (this.feedbackRating === 0) {
-      alert('Please provide a rating.');
-      return;
-    }
-    
-    const feedbackData: AnalysisFeedback = {
-      documentId: parseInt(this.analysisId.split('_')[1]) || Math.floor(Math.random() * 1000)
-    };
-    
-    try {
-      await this.feedbackService.submitFeedback(feedbackData);
-      this.storeFeedbackDetails();
-      this.feedbackSubmitted = true;
-      setTimeout(() => {
-        alert('Thank you for your feedback!');
-      }, 100);
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      this.storeFeedbackDetails();
-      this.feedbackSubmitted = true;
-      alert('Feedback stored locally. Thank you!');
+    if (this.fileInput) {
+      this.fileInput.nativeElement.value = '';
     }
   }
 
-  private storeFeedbackDetails(): void {
-    try {
-      const feedbackDetails = {
-        analysisId: this.analysisId,
-        rating: this.feedbackRating,
-        comment: this.feedbackComment.trim(),
-        industry: this.selectedIndustry,
-        timestamp: new Date().toISOString(),
-        analysisType: this.selectedFile ? 'document' : 'text'
-      };
-      
-      const existingFeedbacks = JSON.parse(localStorage.getItem('analysis_feedbacks') || '[]');
-      existingFeedbacks.push(feedbackDetails);
-      
-      if (existingFeedbacks.length > 50) {
-        existingFeedbacks.splice(0, existingFeedbacks.length - 50);
-      }
-      
-      localStorage.setItem('analysis_feedbacks', JSON.stringify(existingFeedbacks));
-      console.log('Feedback stored locally:', feedbackDetails);
-    } catch (error) {
-      console.error('Error storing feedback:', error);
+  /**
+   * ✅ Datei ausgewählt Event
+   */
+  onFileSelected(event: Event): void {
+    const target = event.target as HTMLInputElement;
+    if (target.files && target.files.length > 0) {
+      this.selectedFile = target.files[0];
+      console.log('📁 File selected:', this.selectedFile.name);
     }
   }
 
-  resetFeedback(): void {
-    this.feedbackRating = 0;
-    this.feedbackComment = '';
-    this.feedbackSubmitted = false;
+  /**
+   * ✅ Dateigröße formatieren
+   */
+  getFileSize(size: number): string {
+    const units = ['Bytes', 'KB', 'MB', 'GB'];
+    let index = 0;
+    let fileSize = size;
+
+    while (fileSize >= 1024 && index < units.length - 1) {
+      fileSize /= 1024;
+      index++;
+    }
+
+    return `${Math.round(fileSize * 100) / 100} ${units[index]}`;
   }
 
-  closeFeedback(): void {
-    this.showFeedback = false;
-    this.resetFeedback();
-  }
-
-  getStars(): number[] {
-    return [1, 2, 3, 4, 5];
-  }
-
-  // =============================================
-  // UI HELPER METHODS
-  // =============================================
-
+  /**
+   * ✅ Confidence CSS-Klasse - FEHLER KORRIGIERT
+   */
   getConfidenceClass(confidence: number | undefined): string {
-    if (!confidence) return 'low';
-    if (confidence >= 70) return 'high';
-    if (confidence >= 40) return 'medium';
-    return 'low';
+    // Fallback auf 0 wenn confidence undefined ist
+    const conf = confidence || 0;
+    if (conf >= 80) return 'confidence-high';
+    if (conf >= 60) return 'confidence-medium';
+    return 'confidence-low';
   }
 
-  getRiskLabel(riskLevel: number): string {
-    if (riskLevel <= 3) return 'Niedrig';
-    if (riskLevel <= 6) return 'Mittel';
-    return 'Hoch';
-  }
-
+  /**
+   * ✅ Währung formatieren
+   */
   formatCurrency(amount: number): string {
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
@@ -642,80 +257,557 @@ export class DocumentUploadComponent implements OnInit {
     }).format(amount);
   }
 
-  // =============================================
-  // EXPORT METHODS
-  // =============================================
+  /**
+   * ✅ Risiko-Label abrufen
+   */
+  getRiskLabel(riskLevel: number): string {
+    if (riskLevel <= 3) return 'Niedrig';
+    if (riskLevel <= 6) return 'Mittel';
+    return 'Hoch';
+  }
 
+  /**
+   * ✅ PDF exportieren
+   */
   exportToPDF(): void {
-    if (!this.analysisResult) return;
-    
-    const content = this.generateReportContent();
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analysis-report-${Date.now()}.txt`;
-    link.click();
-    
-    URL.revokeObjectURL(url);
+    console.log('📄 Exporting to PDF...');
+    // TODO: PDF Export implementieren
+    alert('PDF-Export wird implementiert');
   }
 
+  /**
+   * ✅ Excel exportieren
+   */
   exportToExcel(): void {
-    if (!this.analysisResult) return;
-    
-    const csvContent = this.generateCSVContent();
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analysis-data-${Date.now()}.csv`;
-    link.click();
-    
-    URL.revokeObjectURL(url);
+    console.log('📊 Exporting to Excel...');
+    // TODO: Excel Export implementieren
+    alert('Excel-Export wird implementiert');
   }
 
+  /**
+   * ✅ JSON exportieren
+   */
   exportToJSON(): void {
-    if (!this.analysisResult) return;
-    
-    const dataStr = JSON.stringify(this.analysisResult, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analysis-result-${Date.now()}.json`;
-    link.click();
-    
-    URL.revokeObjectURL(url);
-  }
-
-  shareResults(): void {
-    if (!this.analysisResult) return;
-    
-    const shareData = {
-      title: 'AI Document Analysis Results',
-      text: `Industry: ${this.analysisResult.detectedIndustry?.name || 'Unknown'}\nConfidence: ${this.analysisResult.confidence || 0}%`,
-      url: window.location.href
-    };
-    
-    if (navigator.share) {
-      navigator.share(shareData).catch(console.error);
-    } else {
-      navigator.clipboard.writeText(
-        `${shareData.title}\n\n${shareData.text}\n\n${shareData.url}`
-      ).then(() => {
-        alert('Results copied to clipboard!');
-      }).catch(() => {
-        alert('Sharing not available. Please copy URL manually.');
-      });
+    if (this.analysisResult) {
+      const dataStr = JSON.stringify(this.analysisResult, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(dataBlob);
+      link.download = `analysis-${Date.now()}.json`;
+      link.click();
+      
+      setTimeout(() => URL.revokeObjectURL(link.href), 100);
     }
   }
 
-  // =============================================
-  // UTILITY METHODS
-  // =============================================
+  /**
+   * ✅ Ergebnisse teilen
+   */
+  shareResults(): void {
+    if (this.analysisResult) {
+      const shareData = {
+        title: 'AI Document Analysis Results',
+        text: `Analysis completed: ${this.analysisResult.summary}`,
+        url: window.location.href
+      };
+
+      if (navigator.share) {
+        navigator.share(shareData);
+      } else {
+        // Fallback: Copy to clipboard
+        navigator.clipboard.writeText(JSON.stringify(shareData, null, 2));
+        alert('Ergebnisse in Zwischenablage kopiert!');
+      }
+    }
+  }
+
+  /**
+   * ✅ Feedback-Rating setzen
+   */
+  setFeedbackRating(rating: number): void {
+    this.feedbackRating = rating;
+    console.log('⭐ Feedback rating set:', rating);
+  }
+
+  /**
+   * ✅ Sterne für Rating abrufen
+   */
+  getStars(): number[] {
+    return [1, 2, 3, 4, 5];
+  }
+
+  /**
+   * ✅ Text-Länge prüfen
+   */
+  isTextTooLong(): boolean {
+    return this.textInput.length > this.getTextLimit();
+  }
+
+  /**
+   * ✅ Text-Limit abrufen
+   */
+  getTextLimit(): number {
+    return this.textLimits[this.currentPlan];
+  }
+
+  /**
+   * ✅ Zahlen formatieren
+   */
+  formatNumber(num: number): string {
+    return new Intl.NumberFormat('de-DE').format(num);
+  }
+
+  /**
+   * ✅ Demo-Text laden
+   */
+  loadDemoText(industry: string): void {
+    const demoTexts: { [key: string]: string } = {
+      'ecommerce': `
+### E-Commerce Modernisierung - FashionForward
+
+**Projektübersicht:**
+FashionForward ist ein etabliertes Mode-Unternehmen mit über 50.000 Produkten und einem Jahresumsatz von 25 Millionen Euro. Das Unternehmen möchte seine veraltete E-Commerce-Plattform komplett modernisieren, um mit der Konkurrenz mithalten zu können.
+
+**Aktuelle Herausforderungen:**
+- Veraltete Magento 1.x Installation
+- Langsame Ladezeiten (>5 Sekunden)
+- Keine Mobile-Optimierung
+- Veraltetes Payment-System
+- Keine Integration mit modernen Marketing-Tools
+
+**Technische Anforderungen:**
+- Frontend: React/Next.js mit TypeScript
+- Backend: Node.js mit Express oder Spring Boot
+- Datenbank: PostgreSQL mit Redis für Caching
+- Payment: Stripe, PayPal, SEPA
+- Mobile: Progressive Web App (PWA)
+- DevOps: Docker, Kubernetes, AWS/Azure
+- Analytics: Google Analytics 4, Hotjar
+
+**Geschäftsziele:**
+- Verdopplung der Conversion Rate
+- 50% Reduzierung der Ladezeiten
+- Mobile-First Design
+- Internationale Expansion
+- Inventory Management Integration
+- Customer Service Chatbot Integration
+
+**Budget:** 150.000 - 300.000 Euro
+**Timeline:** 8-12 Monate
+      `,
+      'healthcare': `
+### Krankenhaus-Management System - Universitätsklinikum
+
+**Projektbeschreibung:**
+Das Universitätsklinikum mit 1.200 Betten und 5.000 Mitarbeitern benötigt ein neues digitales Management-System zur Optimierung der Patientenversorgung und Verwaltungsprozesse.
+
+**Compliance-Anforderungen:**
+- HIPAA Compliance (USA)
+- GDPR/DSGVO Konformität
+- HL7 FHIR Standards
+- IHE Integration Profile
+- ISO 27001 Zertifizierung
+
+**Funktionale Anforderungen:**
+- Elektronische Patientenakte (EPA)
+- Terminverwaltung und -planung
+- Medikamentenverwaltung
+- Laborergebnisse Integration
+- Bildgebung (DICOM) Integration
+- Abrechnungsautomatisierung
+- Reporting und Analytics
+
+**Technische Spezifikationen:**
+- Frontend: Angular 16+ mit Angular Material
+- Backend: Spring Boot mit Spring Security
+- Datenbank: PostgreSQL mit Audit-Logging
+- Integration: RESTful APIs, HL7 FHIR
+- Security: OAuth2, JWT, Multi-Factor Authentication
+- Infrastructure: On-Premise mit Cloud-Backup
+- Monitoring: ELK Stack, Prometheus
+
+**Besondere Anforderungen:**
+- 99.9% Verfügbarkeit
+- End-to-End Verschlüsselung
+- Audit-Trail für alle Aktionen
+- Disaster Recovery Plan
+- Mehrsprachige Unterstützung
+
+**Investition:** 800.000 - 1.200.000 Euro
+**Implementierung:** 18-24 Monate
+      `,
+      'fintech': `
+### Payment-Platform - SecurePay Solutions
+
+**Geschäftsmodell:**
+SecurePay entwickelt eine moderne Payment-Plattform für europäische KMUs mit Fokus auf Sicherheit, Benutzerfreundlichkeit und Compliance mit aktuellen Finanzregulierungen.
+
+**Regulatorische Anforderungen:**
+- PCI DSS Level 1 Compliance
+- PSD2 Strong Customer Authentication
+- GDPR Datenschutz
+- AML (Anti-Money Laundering)
+- KYC (Know Your Customer)
+- Banking License Requirements
+
+**Technische Architektur:**
+- Microservices mit Spring Boot
+- Event-Driven Architecture (Apache Kafka)
+- Real-time Transaction Processing
+- Fraud Detection mit Machine Learning
+- API-First Design (RESTful + GraphQL)
+- Database: PostgreSQL + Redis + InfluxDB
+
+**Security Features:**
+- End-to-End Encryption (AES-256)
+- Hardware Security Modules (HSM)
+- Multi-Factor Authentication
+- Real-time Fraud Monitoring
+- Tokenization von Kartendaten
+- Secure Communication (mTLS)
+
+**Integration Partners:**
+- SEPA Direct Debit
+- Credit Card Processors (Visa, Mastercard)
+- Open Banking APIs
+- Cryptocurrency Gateways
+- Accounting Software (DATEV, SAP)
+
+**Skalierungsanforderungen:**
+- 10.000 Transaktionen pro Sekunde
+- Sub-100ms Response Times
+- 99.99% Uptime SLA
+- Multi-Region Deployment
+- Auto-Scaling Infrastructure
+
+**Finanzierung:** 2.000.000 - 5.000.000 Euro
+**Go-to-Market:** 12-18 Monate
+      `,
+      'manufacturing': `
+### Smart Factory IoT - Industry 4.0 Initiative
+
+**Unternehmenskontext:**
+Produktionsunternehmen mit 15.000 Sensoren, 500 Maschinen und 1.200 Mitarbeitern implementiert eine vollständige Industry 4.0 Transformation zur Optimierung der Produktionseffizienz.
+
+**IoT Infrastructure:**
+- 15.000+ Industrial IoT Sensors
+- Edge Computing Nodes (NVIDIA Jetson)
+- 5G Private Network
+- Time-Sensitive Networking (TSN)
+- Digital Twin Technology
+- Augmented Reality (AR) Maintenance
+
+**Predictive Analytics:**
+- Machine Learning für Predictive Maintenance
+- Computer Vision für Quality Control
+- Real-time Anomaly Detection
+- Supply Chain Optimization
+- Energy Consumption Monitoring
+- Workforce Analytics
+
+**Technology Stack:**
+- Backend: Spring Boot Microservices
+- Message Broker: Apache Kafka + MQTT
+- Database: InfluxDB + PostgreSQL + MongoDB
+- Analytics: Apache Spark + TensorFlow
+- Visualization: Grafana + Custom React Dashboards
+- Infrastructure: Kubernetes + Docker
+
+**Integration Systems:**
+- ERP System (SAP S/4HANA)
+- MES (Manufacturing Execution System)
+- SCADA (Supervisory Control)
+- PLM (Product Lifecycle Management)
+- WMS (Warehouse Management)
+
+**Compliance & Standards:**
+- ISO 9001 Quality Management
+- ISO 14001 Environmental Management
+- IEC 61499 Function Blocks
+- OPC UA Communication
+- GDPR Worker Data Protection
+
+**KPIs & Metrics:**
+- Overall Equipment Effectiveness (OEE): +25%
+- Predictive Maintenance Accuracy: 95%
+- Energy Efficiency: +20%
+- Defect Rate Reduction: -40%
+- Production Flexibility: +60%
+
+**Investment:** 3.000.000 - 8.000.000 Euro
+**Rollout Phase:** 24-36 Monate
+      `
+    };
+
+    this.textInput = demoTexts[industry] || demoTexts['ecommerce'];
+    this.selectedIndustry = industry;
+    console.log('📋 Demo text loaded for industry:', industry);
+  }
+
+  // ===================================
+  // FEEDBACK METHODEN - FEHLER KORRIGIERT
+  // ===================================
+
+  /**
+   * ✅ Feedback absenden - FEHLER KORRIGIERT
+   */
+  submitFeedback(): void {
+    if (this.feedbackRating === 0) {
+      alert('Bitte wählen Sie eine Bewertung aus');
+      return;
+    }
+
+    const feedback: AnalysisFeedback = {
+      documentId: parseInt(this.analysisId) || 0,
+      overallRating: this.feedbackRating,
+      userComments: this.feedbackComment,
+      summaryRating: this.feedbackRating,
+      keywordsRating: this.feedbackRating,
+      componentsRating: this.feedbackRating
+    };
+
+    // KORRIGIERT: Nur ein Parameter für submitFeedback
+    this.feedbackService.submitFeedback(feedback).subscribe({
+      next: () => {
+        this.feedbackSubmitted = true;
+        console.log('✅ Feedback submitted successfully');
+      },
+      error: (error) => {
+        console.error('❌ Feedback submission failed:', error);
+        alert('Feedback konnte nicht gesendet werden');
+      }
+    });
+  }
+
+  /**
+   * ✅ Feedback zurücksetzen
+   */
+  resetFeedback(): void {
+    this.feedbackRating = 0;
+    this.feedbackComment = '';
+    this.feedbackSubmitted = false;
+  }
+
+  /**
+   * ✅ Feedback schließen
+   */
+  closeFeedback(): void {
+    this.showFeedback = false;
+    this.resetFeedback();
+  }
+
+  // ===================================
+  // ANALYSIS METHODEN (Backend-Only)
+  // ===================================
+
+  /**
+   * ✅ Dokument analysieren - Backend-Only
+   */
+  async analyzeDocument(): Promise<void> {
+    if (!this.selectedFile || this.isAnalyzing) return;
+    
+    console.log('📄 Starting document analysis - Backend-Only');
+    
+    if (!this.backendStatus.available) {
+      this.handleError('🔌 Backend nicht verfügbar. Bitte starten Sie den Spring Boot Server.');
+      return;
+    }
+    
+    this.isAnalyzing = true;
+    this.clearResults();
+
+    const options: AnalysisOptions = this.getAnalysisOptions();
+    
+    this.apiService.analyzeDocument(this.selectedFile, options)
+      .pipe(finalize(() => this.isAnalyzing = false))
+      .subscribe({
+        next: (result) => {
+          console.log('✅ Backend document analysis completed');
+          this.handleAnalysisSuccess(result);
+        },
+        error: (error) => {
+          console.error('❌ Backend document analysis failed:', error.message);
+          this.handleAnalysisError(error);
+        }
+      });
+  }
+
+  /**
+   * ✅ Text analysieren - Backend-Only
+   */
+  async analyzeText(): Promise<void> {
+    if (!this.textInput.trim() || this.isAnalyzing || this.isTextTooLong()) return;
+    
+    console.log('📄 Starting text analysis - Backend-Only');
+    
+    if (!this.backendStatus.available) {
+      this.handleError('🔌 Backend nicht verfügbar. Bitte starten Sie den Spring Boot Server.');
+      return;
+    }
+    
+    this.isAnalyzing = true;
+    this.clearResults();
+
+    const request = {
+      text: this.textInput,
+      title: this.selectedIndustry === 'auto' ? 'Text Analysis' : `${this.getIndustryName(this.selectedIndustry)} Analysis`,
+      saveDocument: true,
+      options: this.getAnalysisOptions()
+    };
+
+    this.apiService.analyzeText(request)
+      .pipe(finalize(() => this.isAnalyzing = false))
+      .subscribe({
+        next: (result) => {
+          console.log('✅ Backend text analysis completed');
+          this.handleAnalysisSuccess(result);
+        },
+        error: (error) => {
+          console.error('❌ Backend text analysis failed:', error.message);
+          this.handleAnalysisError(error);
+        }
+      });
+  }
+
+  // ===================================
+  // PRIVATE HELPER METHODEN
+  // ===================================
+
+  private initializeRouteBasedMode(): void {
+    const routeData = this.route.snapshot.data;
+    
+    this.isHealthCheckMode = !!routeData['healthCheck'];
+    this.isDemoMode = !!routeData['demoMode'];
+    this.demoIndustry = routeData['demoIndustry'] || null;
+    this.isNotFoundMode = !!routeData['notFound'];
+    
+    console.log('🗺️ Route-based mode initialized:', {
+      healthCheck: this.isHealthCheckMode,
+      demo: this.isDemoMode,
+      industry: this.demoIndustry,
+      notFound: this.isNotFoundMode
+    });
+
+    if (this.isDemoMode && this.demoIndustry) {
+      this.selectedIndustry = this.demoIndustry;
+      this.loadDemoText(this.demoIndustry);
+    }
+  }
+
+  private loadIndustries(): void {
+    this.industries = this.industryService.getAllIndustries();
+  }
+
+  private async checkBackendAvailability(): Promise<void> {
+    console.log('🔍 Checking backend availability...');
+    
+    try {
+      this.backendStatus.lastCheck = new Date();
+      const aiHealth = await this.apiService.checkAiHealth().toPromise();
+      
+      this.backendStatus.available = true;
+      this.backendStatus.aiServiceStatus = aiHealth?.status || 'UP';
+      this.backendStatus.errorDetails = null;
+      
+    } catch (error: any) {
+      console.error('❌ Backend availability check failed:', error);
+      
+      this.backendStatus.available = false;
+      this.backendStatus.aiServiceStatus = 'DOWN';
+      this.backendStatus.errorDetails = this.categorizeBackendError(error);
+    }
+  }
+
+  private handleQueryParameters(): void {
+    this.route.queryParams.subscribe(params => {
+      if (params['error']) {
+        this.errorMessage = params['error'];
+      }
+      if (params['industry']) {
+        this.selectedIndustry = params['industry'];
+      }
+    });
+  }
+
+  private getAnalysisOptions(): AnalysisOptions {
+    return {
+      generateSummary: true,
+      extractKeywords: true,
+      suggestComponents: true,
+      performSentimentAnalysis: true,
+      detectLanguage: true,
+      calculateMetrics: true
+    };
+  }
+
+  private handleAnalysisSuccess(result: any): void {
+    console.log('🎉 Analysis successful - processing backend result');
+    
+    this.analysisResult = this.processBackendResponse(result);
+    
+    if (this.selectedIndustry === 'auto' && this.analysisResult?.detectedIndustry) {
+      this.selectedIndustry = this.analysisResult.detectedIndustry.id;
+    }
+    
+    this.analysisId = this.generateAnalysisId();
+    this.showFeedback = true;
+    this.feedbackSubmitted = false;
+    
+    console.log('✅ Analysis result ready for display');
+  }
+
+  private handleAnalysisError(error: any): void {
+    console.error('💥 Backend analysis error:', error.message);
+    
+    const categorizedError = this.categorizeBackendError(error);
+    this.errorMessage = categorizedError;
+    this.analysisResult = null;
+    
+    this.backendStatus.available = false;
+    this.backendStatus.errorDetails = categorizedError;
+    this.backendStatus.lastCheck = new Date();
+  }
+
+  private processBackendResponse(result: any): EnhancedAnalysisResult {
+    let normalized: EnhancedAnalysisResult = {};
+    
+    if (result.document) {
+      const doc = result.document;
+      normalized = {
+        document: doc,
+        message: result.message,
+        metadata: result.metadata,
+        processingTimeMs: result.processingTimeMs,
+        summary: doc.summary,
+        detectedIndustry: {
+          id: doc.documentType?.toLowerCase() || 'it',
+          name: doc.documentType || 'IT/Software',
+          description: doc.documentType || 'Backend analysis'
+        },
+        confidence: doc.qualityScore || 75
+      };
+    }
+    
+    return normalized;
+  }
+
+  private categorizeBackendError(error: any): string {
+    if (error.status === 0) {
+      return '🔌 Backend nicht erreichbar. Läuft der Spring Boot Server auf Port 8080?';
+    }
+    if (error.status === 400) {
+      return '⚠️ Ungültige Anfrage. Überprüfen Sie Ihre Eingabe.';
+    }
+    if (error.status === 404) {
+      return '🔍 Backend-Endpoint nicht gefunden. Prüfen Sie die API-Konfiguration.';
+    }
+    if (error.status === 500) {
+      return '⚡ Backend-Server-Fehler. Prüfen Sie die Spring Boot Logs.';
+    }
+    
+    return `❌ Backend-Fehler: ${error.message || 'Unbekannter Fehler'}`;
+  }
 
   private clearResults(): void {
     this.analysisResult = null;
@@ -727,562 +819,11 @@ export class DocumentUploadComponent implements OnInit {
   private generateAnalysisId(): string {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
-    return `analysis_${timestamp}_${random}`;
+    return `backend_analysis_${timestamp}_${random}`;
   }
 
-  private isTechnicalTerm(term: string): boolean {
-    const techTerms = [
-      'React', 'Vue', 'Angular', 'Node.js', 'Express', 'TypeScript', 'JavaScript',
-      'API', 'REST', 'GraphQL', 'JSON', 'Database', 'PostgreSQL', 'MongoDB', 'Redis',
-      'Framework', 'Algorithm', 'Software', 'System', 'Code', 'Development',
-      'PWA', 'SPA', 'Docker', 'Kubernetes', 'AWS', 'Azure', 'Cloud', 'Microservices',
-      'CI/CD', 'DevOps', 'Terraform', 'Elasticsearch', 'CDN', 'SSL', 'HTTPS',
-      'Payment', 'Integration', 'Caching', 'Performance', 'Security', 'Authentication'
-    ];
-    return techTerms.some(t => term.toLowerCase().includes(t.toLowerCase()));
-  }
-
-  // 🆕 Local analysis fallback when backend provides minimal data
-  private performLocalAnalysis(text: string): any {
-    const technologyKeywords = this.extractTechnologyKeywords(text);
-    const businessKeywords = this.extractBusinessKeywords(text);
-    const complianceKeywords = this.extractComplianceKeywords(text);
-    
-    return {
-      summary: this.generateLocalSummary(text),
-      technologyKeywords,
-      businessKeywords, 
-      complianceKeywords,
-      highPriorityRecommendations: this.generateHighPriorityRecommendations(text),
-      mediumPriorityRecommendations: this.generateMediumPriorityRecommendations(text),
-      lowPriorityRecommendations: this.generateLowPriorityRecommendations(text),
-      estimatedBudget: this.estimateBudgetFromText(text),
-      timeline: this.estimateTimelineFromText(text),
-      recommendedStack: this.recommendTechStackFromText(text),
-      successMetrics: this.generateSuccessMetrics(text),
-      complianceResults: this.analyzeComplianceFromText(text),
-      riskAssessment: this.assessRiskFromText(text)
-    };
-  }
-
-  private detectIndustryFromText(text: string): any {
-    const lowerText = text.toLowerCase();
-    
-    // E-Commerce indicators
-    if (lowerText.includes('e-commerce') || lowerText.includes('shop') || 
-        lowerText.includes('payment') || lowerText.includes('checkout') ||
-        lowerText.includes('conversion') || lowerText.includes('fashion')) {
-      return {
-        id: 'ecommerce',
-        name: 'E-Commerce & Retail',
-        description: 'Detected based on e-commerce, shopping, and retail keywords',
-        confidence: 75
-      };
-    }
-    
-    // Healthcare indicators
-    if (lowerText.includes('health') || lowerText.includes('medical') || 
-        lowerText.includes('patient') || lowerText.includes('hospital') ||
-        lowerText.includes('fhir') || lowerText.includes('hipaa')) {
-      return {
-        id: 'healthcare',
-        name: 'Healthcare',
-        description: 'Detected based on healthcare and medical keywords',
-        confidence: 80
-      };
-    }
-    
-    // Fintech indicators  
-    if (lowerText.includes('fintech') || lowerText.includes('banking') ||
-        lowerText.includes('payment') || lowerText.includes('financial') ||
-        lowerText.includes('pci-dss') || lowerText.includes('fraud')) {
-      return {
-        id: 'fintech',
-        name: 'Fintech & Banking',
-        description: 'Detected based on financial and payment keywords',
-        confidence: 85
-      };
-    }
-    
-    // Manufacturing indicators
-    if (lowerText.includes('manufacturing') || lowerText.includes('iot') ||
-        lowerText.includes('industry 4.0') || lowerText.includes('factory') ||
-        lowerText.includes('production') || lowerText.includes('automation')) {
-      return {
-        id: 'manufacturing',
-        name: 'Manufacturing & Industry 4.0',
-        description: 'Detected based on manufacturing and IoT keywords',
-        confidence: 78
-      };
-    }
-    
-    // Default to IT
-    return {
-      id: 'it',
-      name: 'IT & Software',
-      description: 'Default classification for technology projects',
-      confidence: 50
-    };
-  }
-
-  private extractTechnologyKeywords(text: string): string[] {
-    const techTerms = [
-      'React', 'Vue.js', 'Angular', 'Node.js', 'Express', 'TypeScript', 'JavaScript',
-      'PWA', 'SPA', 'GraphQL', 'REST API', 'Microservices', 'Docker', 'Kubernetes',
-      'PostgreSQL', 'MongoDB', 'Redis', 'Elasticsearch', 'AWS', 'Azure', 'CloudFront',
-      'CI/CD', 'DevOps', 'Terraform', 'PayPal', 'Stripe', 'CDN', 'SSL', 'HTTPS'
-    ];
-    
-    const found: string[] = [];
-    const lowerText = text.toLowerCase();
-    
-    techTerms.forEach(term => {
-      if (lowerText.includes(term.toLowerCase())) {
-        found.push(term);
-      }
-    });
-    
-    return found.slice(0, 10); // Limit to top 10
-  }
-
-  private extractBusinessKeywords(text: string): string[] {
-    const businessTerms = [
-      'E-Commerce', 'Conversion Rate', 'Mobile Commerce', 'Customer Experience',
-      'ROI', 'Revenue', 'Sales', 'Marketing', 'Branding', 'Customer Journey',
-      'User Experience', 'Performance', 'Scalability', 'Growth', 'Strategy',
-      'Business Intelligence', 'Analytics', 'KPI', 'Optimization', 'Automation'
-    ];
-    
-    const found: string[] = [];
-    const lowerText = text.toLowerCase();
-    
-    businessTerms.forEach(term => {
-      if (lowerText.includes(term.toLowerCase())) {
-        found.push(term);
-      }
-    });
-    
-    return found.slice(0, 8); // Limit to top 8
-  }
-
-  private extractComplianceKeywords(text: string): string[] {
-    const complianceTerms = [
-      'GDPR', 'DSGVO', 'PCI-DSS', 'SOC 2', 'ISO 27001', 'HIPAA', 'PSD2',
-      'Security', 'Privacy', 'Data Protection', 'Compliance', 'Audit',
-      'Encryption', 'Authentication', 'Authorization', 'Access Control'
-    ];
-    
-    const found: string[] = [];
-    const lowerText = text.toLowerCase();
-    
-    complianceTerms.forEach(term => {
-      if (lowerText.includes(term.toLowerCase())) {
-        found.push(term);
-      }
-    });
-    
-    return found.slice(0, 6); // Limit to top 6
-  }
-
-  private generateLocalSummary(text: string): string {
-    const firstSentences = text.split('.').slice(0, 3).join('.').trim();
-    if (firstSentences.length > 200) {
-      return firstSentences.substring(0, 200) + '...';
-    }
-    return firstSentences + '.';
-  }
-
-  private generateHighPriorityRecommendations(text: string): string[] {
-    const lowerText = text.toLowerCase();
-    const recommendations: string[] = [];
-    
-    if (lowerText.includes('performance') || lowerText.includes('speed')) {
-      recommendations.push('Performance-Optimierung durch CDN und Caching implementieren');
-    }
-    if (lowerText.includes('mobile') || lowerText.includes('responsive')) {
-      recommendations.push('Mobile-First Design für bessere User Experience');
-    }
-    if (lowerText.includes('security') || lowerText.includes('sicherheit')) {
-      recommendations.push('Comprehensive Security Audit und Penetration Testing');
-    }
-    if (lowerText.includes('payment') || lowerText.includes('checkout')) {
-      recommendations.push('Optimierte Checkout-Experience für höhere Conversion Rate');
-    }
-    
-    return recommendations.slice(0, 3);
-  }
-
-  private generateMediumPriorityRecommendations(text: string): string[] {
-    return [
-      'A/B Testing Framework für kontinuierliche Optimierung',
-      'Personalisierung durch Machine Learning implementieren',
-      'Advanced Analytics und Customer Insights Dashboard'
-    ];
-  }
-
-  private generateLowPriorityRecommendations(text: string): string[] {
-    return [
-      'Social Media Integration für virales Marketing',
-      'Customer Review System für Vertrauensbildung',
-      'Internationalisierung für globale Expansion'
-    ];
-  }
-
-  private estimateBudgetFromText(text: string): any {
-    const lowerText = text.toLowerCase();
-    let baseAmount = 200000; // Base 200k
-    
-    // Extract budget if mentioned
-    const budgetMatch = text.match(/(\d{1,3}(?:\.\d{3})*)\s*(?:€|Euro)/g);
-    if (budgetMatch) {
-      const budgetStr = budgetMatch[0].replace(/[^\d]/g, '');
-      const mentionedBudget = parseInt(budgetStr);
-      if (mentionedBudget > 50000) {
-        baseAmount = mentionedBudget;
-      }
-    }
-    
-    // Adjust based on complexity indicators
-    if (lowerText.includes('enterprise') || lowerText.includes('microservices')) {
-      baseAmount *= 1.5;
-    }
-    if (lowerText.includes('ai') || lowerText.includes('machine learning')) {
-      baseAmount *= 1.3;
-    }
-    if (lowerText.includes('international') || lowerText.includes('multi-region')) {
-      baseAmount *= 1.2;
-    }
-    
-    return {
-      min: Math.round(baseAmount * 0.8),
-      max: Math.round(baseAmount * 1.3),
-      confidence: 'medium',
-      factors: [
-        'Projektgröße und Komplexität berücksichtigt',
-        'Technologie-Stack Komplexität einkalkuliert',
-        'Marktübliche Entwicklungskosten angewandt'
-      ]
-    };
-  }
-
-  private estimateTimelineFromText(text: string): any {
-    const lowerText = text.toLowerCase();
-    let months = 8; // Base 8 months
-    
-    // Extract timeline if mentioned
-    const timelineMatch = text.match(/(\d{1,2})\s*(?:-\s*(\d{1,2}))?\s*(?:Monat|month)/gi);
-    if (timelineMatch) {
-      const timeStr = timelineMatch[0].match(/\d{1,2}/g);
-      if (timeStr) {
-        months = parseInt(timeStr[0]);
-      }
-    }
-    
-    return {
-      estimated: months,
-      phases: [
-        { name: 'Discovery & Design', duration: Math.round(months * 0.2), dependencies: [], deliverables: ['Requirements'] },
-        { name: 'Development', duration: Math.round(months * 0.5), dependencies: ['Discovery'], deliverables: ['MVP'] },
-        { name: 'Testing & Launch', duration: Math.round(months * 0.3), dependencies: ['Development'], deliverables: ['Go-Live'] }
-      ],
-      criticalPath: ['Requirements Analysis', 'Core Development', 'Integration Testing', 'Go-Live']
-    };
-  }
-
-  private recommendTechStackFromText(text: string): any {
-    const lowerText = text.toLowerCase();
-    const stack = {
-      frontend: ['React', 'TypeScript'],
-      backend: ['Node.js', 'Express'],
-      database: ['PostgreSQL'],
-      infrastructure: ['Docker', 'AWS']
-    };
-    
-    // Frontend recommendations
-    if (lowerText.includes('vue')) {
-      stack.frontend = ['Vue.js', 'TypeScript'];
-    }
-    if (lowerText.includes('angular')) {
-      stack.frontend = ['Angular', 'TypeScript'];
-    }
-    if (lowerText.includes('pwa')) {
-      stack.frontend.push('PWA');
-    }
-    
-    // Backend recommendations
-    if (lowerText.includes('java') || lowerText.includes('spring')) {
-      stack.backend = ['Java', 'Spring Boot'];
-    }
-    if (lowerText.includes('microservices')) {
-      stack.backend.push('Microservices');
-    }
-    
-    // Database recommendations
-    if (lowerText.includes('mongodb')) {
-      stack.database.push('MongoDB');
-    }
-    if (lowerText.includes('redis')) {
-      stack.database.push('Redis');
-    }
-    if (lowerText.includes('elasticsearch')) {
-      stack.database.push('Elasticsearch');
-    }
-    
-    // Infrastructure
-    if (lowerText.includes('kubernetes')) {
-      stack.infrastructure.push('Kubernetes');
-    }
-    if (lowerText.includes('azure')) {
-      stack.infrastructure = ['Docker', 'Azure'];
-    }
-    
-    return stack;
-  }
-
-  private generateSuccessMetrics(text: string): any[] {
-    return [
-      { name: 'Conversion Rate', current: '2.1%', target: '4.5%', improvement: '+114%' },
-      { name: 'Page Load Time', current: '8s', target: '2s', improvement: '-75%' },
-      { name: 'Mobile Conversion', current: '1.2%', target: '3.8%', improvement: '+217%' },
-      { name: 'SEO Ranking', current: 'Position 15+', target: 'Top 10', improvement: 'Top 10' }
-    ];
-  }
-
-  private analyzeComplianceFromText(text: string): any[] {
-    const results: any[] = [];
-    const lowerText = text.toLowerCase();
-    
-    if (lowerText.includes('gdpr') || lowerText.includes('dsgvo')) {
-      results.push({
-        regulation: 'GDPR/DSGVO',
-        relevance: 'high',
-        foundKeywords: ['GDPR', 'Data Protection'],
-        requirements: ['Cookie Consent', 'Privacy Policy', 'Data Processing Records']
-      });
-    }
-    
-    if (lowerText.includes('pci') || lowerText.includes('payment')) {
-      results.push({
-        regulation: 'PCI-DSS',
-        relevance: 'high',
-        foundKeywords: ['Payment', 'Card Processing'],
-        requirements: ['Secure Payment Processing', 'Encryption', 'Security Monitoring']
-      });
-    }
-    
-    return results;
-  }
-
-  private assessRiskFromText(text: string): any {
-    const lowerText = text.toLowerCase();
-    let overallRisk = 5;
-    
-    // Increase risk based on complexity
-    if (lowerText.includes('enterprise') || lowerText.includes('large scale')) {
-      overallRisk += 1;
-    }
-    if (lowerText.includes('legacy') || lowerText.includes('migration')) {
-      overallRisk += 1;
-    }
-    if (lowerText.includes('tight deadline') || lowerText.includes('aggressive timeline')) {
-      overallRisk += 2;
-    }
-    
-    return {
-      overall: Math.min(overallRisk, 10),
-      security: lowerText.includes('payment') || lowerText.includes('financial') ? 7 : 5,
-      compliance: lowerText.includes('gdpr') || lowerText.includes('regulated') ? 6 : 4,
-      technical: lowerText.includes('microservices') || lowerText.includes('complex') ? 6 : 4,
-      recommendations: [
-        'Agile Entwicklungsansatz für Risikominimierung',
-        'Regelmäßige Stakeholder-Updates und Reviews',
-        'Comprehensive Testing-Strategie implementieren'
-      ]
-    };
-  }
-
-  private generateReportContent(): string {
-    if (!this.analysisResult) return '';
-    
-    return `AI DOCUMENT ANALYSIS REPORT
-===========================
-
-Industry: ${this.analysisResult.detectedIndustry?.name || 'Unknown'}
-Confidence: ${this.analysisResult.confidence || 0}%
-Analysis Date: ${new Date().toLocaleDateString('de-DE')}
-
-SUMMARY
-=======
-${this.analysisResult.summary || 'No summary available'}
-
-KEYWORDS
-========
-Technology: ${this.analysisResult.technologyKeywords?.join(', ') || 'None'}
-Business: ${this.analysisResult.businessKeywords?.join(', ') || 'None'}
-Compliance: ${this.analysisResult.complianceKeywords?.join(', ') || 'None'}
-
-HIGH PRIORITY RECOMMENDATIONS
-=============================
-${this.analysisResult.highPriorityRecommendations?.map((rec, i) => `${i + 1}. ${rec}`).join('\n') || 'None'}
-
-BUDGET ESTIMATION
-================
-${this.analysisResult.estimatedBudget ? 
-  `Min: ${this.formatCurrency(this.analysisResult.estimatedBudget.min)}\nMax: ${this.formatCurrency(this.analysisResult.estimatedBudget.max)}` : 
-  'Not available'}
-
-TIMELINE: ${this.analysisResult.timeline?.estimated || 'TBD'} months`;
-  }
-
-  private generateCSVContent(): string {
-    if (!this.analysisResult) return '';
-    
-    const rows = [
-      ['Category', 'Value'],
-      ['Industry', this.analysisResult.detectedIndustry?.name || 'Unknown'],
-      ['Confidence', `${this.analysisResult.confidence || 0}%`],
-      ['Summary Length', (this.analysisResult.summary?.length || 0).toString()],
-      ['Tech Keywords', (this.analysisResult.technologyKeywords?.length || 0).toString()],
-      ['Business Keywords', (this.analysisResult.businessKeywords?.length || 0).toString()]
-    ];
-    
-    return rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-  }
-
-  // =============================================
-  // DEMO TEXT METHODS
-  // =============================================
-
-  private getEcommerceDemoText(): string {
-    return `E-Commerce Platform "ShopNext"
-Entwicklung einer modernen Online-Shopping-Plattform
-
-PROJEKTÜBERSICHT:
-Entwicklung einer skalierbaren E-Commerce-Lösung mit React, Node.js und PostgreSQL.
-Die Plattform soll 10.000+ Produkte verwalten und 1000+ gleichzeitige Nutzer unterstützen.
-
-TECHNISCHE ANFORDERUNGEN:
-- Frontend: React 18, TypeScript, Tailwind CSS
-- Backend: Node.js, Express.js, REST API
-- Datenbank: PostgreSQL, Redis für Caching
-- Payment: Stripe, PayPal Integration
-- Deployment: Docker, Kubernetes, AWS
-
-FEATURES:
-- Produktkatalog mit Such- und Filterfunktionen
-- Warenkorb und Checkout-Prozess
-- Benutzerverwaltung und Authentifizierung
-- Admin-Dashboard für Produktverwaltung
-- Mobile-responsive Design
-- Real-time Transaction Monitoring
-- API für Drittanbieter-Integration
-- Compliance-Dashboard und Reporting
-
-SICHERHEIT: PCI-DSS, PSD2, GDPR
-BUDGET: €1.500.000 - €2.000.000
-TIMELINE: 18-24 Monate`;
-  }
-
-  private getHealthcareDemoText(): string {
-    return `Healthcare Management System "MediCore"
-Krankenhaus-Verwaltungssystem für 500-Betten-Klinik
-
-PROJEKTBESCHREIBUNG:
-Entwicklung eines FHIR-konformen Krankenhaus-Informationssystems
-für digitale Patientenakten und Workflow-Management.
-
-TECHNISCHE SPEZIFIKATION:
-- Backend: Java Spring Boot, Spring Security
-- Frontend: Angular 16, TypeScript
-- Datenbank: PostgreSQL mit HL7 FHIR Unterstützung
-- Integration: DICOM, HL7, Medizingeräte-APIs
-- Sicherheit: Ende-zu-Ende-Verschlüsselung, HIPAA-Compliance
-
-KERNFUNKTIONEN:
-- Elektronische Patientenakten (EPA)
-- Terminverwaltung und Ressourcenplanung
-- Medikamentenverwaltung mit Interaktionsprüfung
-- Labor- und Bildgebungsintegration
-- Compliance-Dashboard und Audit-Logs
-- Telemedicine-Portal für Remote-Consultations
-- Mobile App für Ärzte und Pflegepersonal
-- Integration mit Medizingeräten (IoMT)
-- Real-time Monitoring und Alerts
-- Patientenportal mit Terminen und Befunden
-
-COMPLIANCE: HIPAA, DSGVO, MDR, FDA
-SICHERHEIT: End-to-End Encryption, Multi-Factor Authentication
-BUDGET: €800.000 - €1.200.000
-TIMELINE: 12-15 Monate
-TEAM: 8-10 Entwickler, 2 Security Experten, 1 Compliance Officer`;
-  }
-
-  private getFintechDemoText(): string {
-    return `Fintech Platform "SecurePay"
-Digitale Payment-Lösung für KMU
-
-PROJEKTKONZEPT:
-Entwicklung einer PCI-DSS-konformen Payment-Plattform
-mit Real-time Fraud Detection und Multi-Currency Support.
-
-TECHNISCHE ARCHITEKTUR:
-- Microservices: Java Spring Boot, Spring Cloud
-- Frontend: React, TypeScript, Material-UI
-- Datenbank: PostgreSQL, MongoDB für Analytics
-- Message Queue: Apache Kafka
-- Security: OAuth 2.0, JWT, 2FA, HSM
-
-HAUPTFUNKTIONEN:
-- Payment Processing (Kreditkarten, SEPA, PayPal)
-- Fraud Detection mit Machine Learning
-- Multi-Currency und Wechselkurs-Management
-- PCI-DSS Level 1 Compliance
-- Real-time Transaction Monitoring
-- API für Drittanbieter-Integration
-- Compliance-Dashboard und Reporting
-- Mobile Payment SDK
-- Subscription Management
-- Chargeback Protection
-- Risk Scoring Engine
-- Blockchain-Integration für Transparenz
-
-SICHERHEIT: PCI-DSS, PSD2, GDPR, SOC 2 Type II
-REGULIERUNG: BaFin, PCI Security Council
-BUDGET: €1.500.000 - €2.000.000
-TIMELINE: 18-24 Monate
-TEAM: 12-15 Entwickler, 3 Security Experten, 2 Compliance Officer`;
-  }
-
-  private getManufacturingDemoText(): string {
-    return `Smart Factory IoT Platform "IndustryConnect"
-Industry 4.0 Lösung für Produktionsoptimierung
-
-PROJEKTBESCHREIBUNG:
-Entwicklung einer IoT-basierten Smart Factory Plattform
-für Predictive Maintenance und Produktionsoptimierung.
-
-TECHNISCHE INFRASTRUKTUR:
-- Backend: Java Spring Boot, Microservices
-- IoT: MQTT, Apache Kafka, InfluxDB
-- Frontend: Angular, TypeScript, D3.js
-- Cloud: AWS IoT Core, Lambda, DynamoDB
-- Analytics: Apache Spark, TensorFlow
-
-KERNFEATURES:
-- 15.000+ IoT Sensoren Integration
-- Real-time Production Monitoring
-- Predictive Maintenance AI
-- Quality Control Automation
-- Supply Chain Optimization
-- Energy Management System
-- Worker Safety Monitoring
-- OEE (Overall Equipment Effectiveness)
-- Digital Twin Technology
-- Automated Reporting
-
-COMPLIANCE: ISO 9001, ISO 14001, Industry 4.0
-BUDGET: €2.500.000 - €3.500.000
-TIMELINE: 24-30 Monate
-TEAM: 20+ Entwickler, IoT Spezialisten, Data Scientists`;
+  private handleError(message: string): void {
+    this.errorMessage = message;
+    console.error('❌ Component Error:', message);
   }
 }

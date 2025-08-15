@@ -1,19 +1,33 @@
-# ---------- Build ----------
-FROM node:18-alpine AS build
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-ARG NG_BUILD_CONFIG=production
-RUN npm run build -- --configuration=${NG_BUILD_CONFIG}
+FROM node:20-alpine AS build
 
-# ---------- Runtime ----------
+WORKDIR /app
+
+# Copy package.json only
+COPY package.json ./
+
+# Install dependencies
+RUN npm install --no-package-lock --no-audit --no-fund
+
+# Copy source and build
+COPY . .
+RUN npm run build:prod
+
+# Production stage
 FROM nginx:alpine
-# nur Server-Block (kein globaler Kram)
+
+# Copy nginx config
 COPY nginx.default.conf /etc/nginx/conf.d/default.conf
-# Angular-Build-Output (achte auf Ordnernamen aus angular.json)
+
+# Copy built app
 COPY --from=build /app/dist/ai-doc-assist-frontend /usr/share/nginx/html
+
+# Health check script
+RUN echo '#!/bin/sh\nwget --no-verbose --tries=1 --spider http://localhost/health || exit 1' > /health-check.sh && \
+    chmod +x /health-check.sh
+
 EXPOSE 80
+
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost/ || exit 1
+    CMD /health-check.sh
+
 CMD ["nginx", "-g", "daemon off;"]

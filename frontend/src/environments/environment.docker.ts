@@ -1,6 +1,10 @@
 export const environment = {
   production: true,
-  //apiUrl: 'http://localhost:8080/api'
-  apiUrl: '/api'
+  apiUrl: '/api', // ✅ Nginx proxy zum Backend
+  features: {
+    industryDetection: true,
+    aiAnalysis: true,
+    batchProcessing: true,
+    realtimeAnalysis: true
+  }
 };
-console.log('🔧  Docker Environment loaded:', environment);
