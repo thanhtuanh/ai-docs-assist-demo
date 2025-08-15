@@ -20,6 +20,7 @@ import com.bits.aidocassist.service.AiService;
 import com.bits.aidocassist.service.IndustryDetectionService;
 
 import lombok.RequiredArgsConstructor;
+
 @RestController
 @RequestMapping("/api/ai")
 @RequiredArgsConstructor
@@ -31,56 +32,106 @@ public class AiController {
     private final AiService aiService;
 
     /**
-     * Branchenerkennung (funktioniert bereits)
+     * ✅ KORRIGIERTE Branchenerkennung mit verbesserter Fehlerbehandlung
      */
     @PostMapping("/detect-industry")
     public ResponseEntity<Map<String, Object>> detectIndustry(@RequestBody Map<String, String> request) {
-        log.info("Received industry detection request");
+        log.info("🔍 Industry detection request received");
 
         String text = request.get("text");
         if (text == null || text.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Text is required"));
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Text field is required");
+            error.put("example", Map.of("text", "BMW entwickelt innovative Fahrzeuge"));
+            error.put("timestamp", System.currentTimeMillis());
+            return ResponseEntity.badRequest().body(error);
         }
 
+        log.debug("📝 Analyzing text: {} characters", text.length());
+        log.debug("🔍 Text preview: {}", text.substring(0, Math.min(100, text.length())));
+
         try {
+            long startTime = System.currentTimeMillis();
             Map<String, Object> result = industryDetectionService.detectIndustry(text);
-            log.info("Industry detection completed successfully");
+            long processingTime = System.currentTimeMillis() - startTime;
+
+            // ✅ Stelle sicher, dass alle erforderlichen Felder vorhanden sind
+            if (!result.containsKey("primaryIndustry")) {
+                result.put("primaryIndustry", "IT/Software");
+            }
+            if (!result.containsKey("confidence")) {
+                result.put("confidence", 75.0);
+            }
+            if (!result.containsKey("topIndustries")) {
+                result.put("topIndustries", Arrays.asList(
+                    Map.of("industry", result.get("primaryIndustry"), "confidence", result.get("confidence"))
+                ));
+            }
+
+            // ✅ Standard-Felder hinzufügen für Frontend-Kompatibilität
+            result.put("detectionMethod", result.getOrDefault("detectionMethod", "Enhanced Keywords"));
+            result.put("enhancedAnalysis", true);
+            result.put("openAiConfigured", isOpenAiConfigured());
+            result.put("processingTimeMs", processingTime);
+            result.put("timestamp", System.currentTimeMillis());
+            result.put("status", "SUCCESS");
+
+            log.info("✅ Industry detection completed: {} ({}% confidence) in {}ms", 
+                    result.get("primaryIndustry"), result.get("confidence"), processingTime);
+            
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {
-            log.error("Industry detection failed: {}", e.getMessage());
-            return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Industry detection failed: " + e.getMessage()));
+            log.error("❌ Industry detection failed: {}", e.getMessage(), e);
+            
+            // ✅ Strukturierte Fehlerantwort
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Industry detection failed");
+            errorResponse.put("message", e.getMessage());
+            errorResponse.put("fallback", createFallbackIndustryResult(text));
+            errorResponse.put("timestamp", System.currentTimeMillis());
+            
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
     /**
-     * 🔧 KORRIGIERTE vollständige Analyse mit robuster Fehlerbehandlung
+     * ✅ KORRIGIERTE umfassende Analyse mit robuster Fehlerbehandlung
      */
     @PostMapping("/analyze")
     public ResponseEntity<Map<String, Object>> analyzeDocument(@RequestBody Map<String, String> request) {
-        log.info("Received comprehensive AI analysis request");
+        log.info("🔬 Comprehensive AI analysis request received");
 
         String text = request.get("text");
         if (text == null || text.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Text is required"));
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "Text is required",
+                "timestamp", System.currentTimeMillis()
+            ));
         }
 
-        try {
-            // 1. Branchenerkennung (funktioniert bereits)
-            Map<String, Object> industryAnalysis = industryDetectionService.detectIndustry(text);
-            log.info("✅ Industry detection completed");
+        log.debug("📝 Analyzing comprehensive text: {} characters", text.length());
 
-            // 2. 🔧 AI-ANALYSE MIT FEHLERBEHANDLUNG:
+        try {
+            // 1. ✅ Branchenerkennung (funktioniert bereits)
+            Map<String, Object> industryAnalysis = industryDetectionService.detectIndustry(text);
+            log.info("✅ Industry analysis completed: {}", industryAnalysis.get("primaryIndustry"));
+
+            // 2. ✅ Text-Analyse mit robuster Fehlerbehandlung
             Map<String, Object> textAnalysis = performRobustTextAnalysis(text);
             log.info("✅ Text analysis completed");
 
-            // 3. Kombiniere Ergebnisse
+            // 3. ✅ Kombiniere Ergebnisse
             Map<String, Object> result = new HashMap<>();
             result.put("industryAnalysis", industryAnalysis);
             result.put("textAnalysis", textAnalysis);
             result.put("timestamp", System.currentTimeMillis());
             result.put("status", "SUCCESS");
+            result.put("processingInfo", Map.of(
+                "textLength", text.length(),
+                "industryConfidence", industryAnalysis.get("confidence"),
+                "analysisMethod", "Enhanced AI + Fallback"
+            ));
 
             log.info("✅ Comprehensive AI analysis completed successfully");
             return ResponseEntity.ok(result);
@@ -88,7 +139,7 @@ public class AiController {
         } catch (Exception e) {
             log.error("❌ Comprehensive AI analysis failed: {}", e.getMessage(), e);
             
-            // Fallback: Nur Branchenerkennung
+            // ✅ Graceful Degradation: Nur Branchenerkennung
             try {
                 Map<String, Object> fallbackResult = new HashMap<>();
                 fallbackResult.put("industryAnalysis", industryDetectionService.detectIndustry(text));
@@ -101,19 +152,22 @@ public class AiController {
                 
             } catch (Exception fallbackError) {
                 log.error("❌ Even fallback analysis failed: {}", fallbackError.getMessage());
-                return ResponseEntity.internalServerError()
-                    .body(Map.of("error", "Analysis failed: " + e.getMessage()));
+                return ResponseEntity.status(500).body(Map.of(
+                    "error", "Analysis failed completely",
+                    "message", e.getMessage(),
+                    "timestamp", System.currentTimeMillis()
+                ));
             }
         }
     }
 
     /**
-     * 🆕 Robuste Text-Analyse mit individueller Fehlerbehandlung
+     * ✅ Robuste Text-Analyse mit individueller Fehlerbehandlung
      */
     private Map<String, Object> performRobustTextAnalysis(String text) {
         Map<String, Object> analysis = new HashMap<>();
         
-        // Summary mit Fallback
+        // ✅ Summary mit Fallback
         String summary = null;
         try {
             summary = aiService.summarizeText(text);
@@ -123,7 +177,7 @@ public class AiController {
             summary = generateFallbackSummary(text);
         }
         
-        // Keywords mit Fallback
+        // ✅ Keywords mit Fallback
         String keywords = null;
         try {
             keywords = aiService.extractKeywords(text);
@@ -133,7 +187,7 @@ public class AiController {
             keywords = generateFallbackKeywords(text);
         }
         
-        // Components mit Fallback
+        // ✅ Components mit Fallback
         String components = null;
         try {
             components = aiService.suggestComponents(text);
@@ -143,19 +197,20 @@ public class AiController {
             components = generateFallbackComponents(text);
         }
 
-        // Ergebnis zusammenstellen
+        // ✅ Ergebnis zusammenstellen
         analysis.put("summary", summary);
         analysis.put("keywords", keywords);
         analysis.put("components", components);
         analysis.put("wordCount", text.split("\\s+").length);
         analysis.put("characterCount", text.length());
+        analysis.put("language", detectLanguage(text));
         analysis.put("method", "AI_WITH_FALLBACK");
         
         return analysis;
     }
 
     /**
-     * 🆕 Fallback Text-Analyse (wenn AI komplett fehlschlägt)
+     * ✅ Fallback Text-Analyse (wenn AI komplett fehlschlägt)
      */
     private Map<String, Object> createFallbackTextAnalysis(String text) {
         Map<String, Object> analysis = new HashMap<>();
@@ -165,14 +220,47 @@ public class AiController {
         analysis.put("components", generateFallbackComponents(text));
         analysis.put("wordCount", text.split("\\s+").length);
         analysis.put("characterCount", text.length());
+        analysis.put("language", detectLanguage(text));
         analysis.put("method", "FALLBACK_ONLY");
         analysis.put("note", "AI services unavailable, using local analysis");
         
         return analysis;
     }
 
+    /**
+     * ✅ Fallback Industry Result
+     */
+    private Map<String, Object> createFallbackIndustryResult(String text) {
+        Map<String, Object> fallback = new HashMap<>();
+        
+        // Einfache keyword-basierte Erkennung
+        String detectedIndustry = "IT/Software"; // Default
+        double confidence = 50.0;
+        
+        String lowerText = text.toLowerCase();
+        if (lowerText.contains("angular") || lowerText.contains("spring") || lowerText.contains("java")) {
+            detectedIndustry = "IT/Software";
+            confidence = 80.0;
+        } else if (lowerText.contains("auto") || lowerText.contains("fahrzeug") || lowerText.contains("bmw")) {
+            detectedIndustry = "Automotive";
+            confidence = 75.0;
+        } else if (lowerText.contains("bank") || lowerText.contains("finanz") || lowerText.contains("payment")) {
+            detectedIndustry = "Finanzwesen";
+            confidence = 70.0;
+        }
+        
+        fallback.put("primaryIndustry", detectedIndustry);
+        fallback.put("confidence", confidence);
+        fallback.put("detectionMethod", "Simple Keyword Fallback");
+        fallback.put("topIndustries", Arrays.asList(
+            Map.of("industry", detectedIndustry, "confidence", confidence)
+        ));
+        
+        return fallback;
+    }
+
     // ================================
-    // 🆕 FALLBACK-METHODEN
+    // ✅ VERBESSERTE FALLBACK-METHODEN
     // ================================
 
     private String generateFallbackSummary(String text) {
@@ -203,8 +291,11 @@ public class AiController {
         String[] words = text.toLowerCase().split("\\s+");
         Map<String, Integer> wordCount = new HashMap<>();
         
+        Set<String> stopWords = Set.of("der", "die", "das", "und", "oder", "aber", "in", "von", "zu", "mit",
+                                      "the", "and", "or", "but", "in", "of", "to", "with", "for", "on", "at");
+        
         for (String word : words) {
-            if (word.length() > 3 && !isStopWord(word)) {
+            if (word.length() > 3 && !stopWords.contains(word)) {
                 wordCount.put(word, wordCount.getOrDefault(word, 0) + 1);
             }
         }
@@ -252,14 +343,32 @@ public class AiController {
                 + " [Lokale Analyse]";
     }
 
-    private boolean isStopWord(String word) {
-        Set<String> stopWords = Set.of("und", "oder", "aber", "von", "mit", "für", "auf", "ein", "eine",
-                                      "and", "or", "but", "of", "with", "for", "on", "a", "an", "the");
-        return stopWords.contains(word);
+    private String detectLanguage(String text) {
+        String lowerText = text.toLowerCase();
+        
+        // Deutsche Wörter
+        long germanWords = Arrays.stream(new String[]{"der", "die", "das", "und", "ist", "mit", "für"})
+                .mapToLong(word -> countOccurrences(lowerText, word))
+                .sum();
+        
+        // Englische Wörter  
+        long englishWords = Arrays.stream(new String[]{"the", "and", "is", "with", "for", "that", "this"})
+                .mapToLong(word -> countOccurrences(lowerText, word))
+                .sum();
+        
+        if (germanWords > englishWords) return "DE";
+        if (englishWords > germanWords) return "EN";
+        return "UNKNOWN";
+    }
+
+    private long countOccurrences(String text, String word) {
+        return Arrays.stream(text.split("\\s+"))
+                .filter(w -> w.equals(word))
+                .count();
     }
 
     /**
-     * 🔧 Health Check - Status auf TRUE setzen nach AiService Integration
+     * ✅ Health Check mit korrektem Status
      */
     @GetMapping("/health")
     public ResponseEntity<Map<String, Object>> health() {
@@ -269,6 +378,7 @@ public class AiController {
 
         Map<String, Object> features = new HashMap<>();
 
+        // ✅ Industry Detection
         Map<String, Object> industryDetection = new HashMap<>();
         industryDetection.put("available", true);
         industryDetection.put("keywordBased", true);
@@ -276,8 +386,9 @@ public class AiController {
         industryDetection.put("supportedIndustries", 10);
         features.put("industryDetection", industryDetection);
 
+        // ✅ Text Analysis  
         Map<String, Object> textAnalysis = new HashMap<>();
-        textAnalysis.put("available", true); // ✅ JETZT AUF TRUE GESETZT
+        textAnalysis.put("available", true);
         textAnalysis.put("status", "Integrated with fallback support");
         textAnalysis.put("aiService", isOpenAiConfigured() ? "OpenAI available" : "Using fallback methods");
         features.put("textAnalysis", textAnalysis);
@@ -288,15 +399,14 @@ public class AiController {
         return ResponseEntity.ok(health);
     }
 
-    // ================================
-    // UNVERÄNDERTE METHODEN
-    // ================================
-
+    /**
+     * ✅ Service Info
+     */
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> info() {
         Map<String, Object> info = new HashMap<>();
         info.put("service", "AI Analysis Service with Industry Detection");
-        info.put("version", "1.2.0"); // Version erhöht nach Integration
+        info.put("version", "1.3.0");
         info.put("description", "AI-powered industry detection with robust text analysis integration");
 
         Map<String, Object> endpoints = new HashMap<>();
@@ -318,14 +428,17 @@ public class AiController {
         return ResponseEntity.ok(info);
     }
 
+    /**
+     * ✅ Supported Industries
+     */
     @GetMapping("/industries")
     public ResponseEntity<Map<String, Object>> getIndustries() {
         Map<String, Object> industries = new HashMap<>();
+        industries.put("IT/Software", "software, entwicklung, angular, spring, java, typescript...");
         industries.put("automotive", "auto, fahrzeug, kfz, motor, bmw, mercedes, audi...");
         industries.put("pharma", "pharma, medikament, arzneimittel, bayer, merck...");
         industries.put("ecommerce", "shop, online, ecommerce, zalando, amazon...");
         industries.put("finance", "bank, finanz, versicherung, allianz...");
-        industries.put("it", "software, entwicklung, programmierung, sap...");
         industries.put("event", "event, marketing, werbung, messe...");
         industries.put("healthcare", "gesundheit, krankenhaus, klinik, arzt...");
         industries.put("education", "bildung, schule, universität, lernen...");
@@ -336,12 +449,16 @@ public class AiController {
         result.put("message", "Supported industries and sample keywords");
         result.put("industries", industries);
         result.put("note", "Each industry has 10-15 keywords for detection");
+        result.put("total", industries.size());
 
         return ResponseEntity.ok(result);
     }
 
+    /**
+     * ✅ Check if OpenAI is configured
+     */
     private boolean isOpenAiConfigured() {
         String apiKey = System.getenv("OPENAI_API_KEY");
-        return apiKey != null && !apiKey.trim().isEmpty();
+        return apiKey != null && !apiKey.trim().isEmpty() && !"test-key".equals(apiKey);
     }
 }

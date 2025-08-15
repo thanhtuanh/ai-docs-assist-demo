@@ -43,6 +43,7 @@ import com.bits.aidocassist.model.Document;
 import com.bits.aidocassist.service.AiService;
 import com.bits.aidocassist.service.DocumentService;
 import com.bits.aidocassist.service.FeedbackService;
+import com.bits.aidocassist.service.IndustryDetectionService;
 import com.bits.aidocassist.service.TextPreprocessingService;
 import com.bits.aidocassist.util.PdfProcessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -66,6 +67,7 @@ public class DocumentController {
     private final AiService aiService;
     private final TextPreprocessingService preprocessingService;
     private final FeedbackService feedbackService;
+    private final IndustryDetectionService industryDetectionService;
     private final ObjectMapper objectMapper;
 
     public DocumentController(
@@ -73,11 +75,13 @@ public class DocumentController {
             AiService aiService,
             TextPreprocessingService preprocessingService,
             FeedbackService feedbackService,
+            IndustryDetectionService industryDetectionService,
             ObjectMapper objectMapper) {
         this.documentService = documentService;
         this.aiService = aiService;
         this.preprocessingService = preprocessingService;
         this.feedbackService = feedbackService;
+        this.industryDetectionService = industryDetectionService;
         this.objectMapper = objectMapper;
     }
 
@@ -225,7 +229,10 @@ public class DocumentController {
     public ResponseEntity<AnalysisResponse> analyzeText(@RequestBody @Valid TextAnalysisRequest request) {
         final Instant t0 = Instant.now();
         String input = Objects.requireNonNullElse(request.getText(), "");
-        logger.info("📝 Direkt-Text-Analyse gestartet: {} Zeichen", input.length());
+        String selectedIndustry = Objects.requireNonNullElse(request.getSelectedIndustry(), "auto");
+
+        logger.info("📝 Direkt-Text-Analyse gestartet: {} Zeichen, Industry: {}",
+                input.length(), selectedIndustry);
 
         try {
             // 1. Text-Preprocessing
@@ -236,7 +243,26 @@ public class DocumentController {
             AnalysisOptions options = request.getOptions() != null ? request.getOptions()
                     : AnalysisOptions.defaultOptions();
 
-            // 2. AI-Service Aufrufe mit Fallback-Mechanismus
+            // 2. ✅ Industry Detection Integration
+            Map<String, Object> industryResult = null;
+            if ("auto".equals(selectedIndustry)) {
+                try {
+                    logger.info("🏭 Starting automatic industry detection...");
+                    industryResult = industryDetectionService.detectIndustry(processedText);
+                    logger.info("✅ Industry detected: {} ({}% confidence)",
+                            industryResult.get("primaryIndustry"),
+                            industryResult.get("confidence"));
+                } catch (Exception e) {
+                    logger.warn("⚠️ Industry detection failed: {}", e.getMessage());
+                    // Create fallback industry result
+                    industryResult = createFallbackIndustryResult();
+                }
+            } else {
+                logger.info("🎯 Using manually selected industry: {}", selectedIndustry);
+                industryResult = createManualIndustryResult(selectedIndustry);
+            }
+
+            // 3. AI-Service Aufrufe mit Industry Context
             String summary = null;
             String keywords = null;
             String components = null;
@@ -254,7 +280,9 @@ public class DocumentController {
             if (options.isExtractKeywords()) {
                 try {
                     keywords = aiService.extractKeywords(processedText);
-                    logger.debug("✅ Keywords extrahiert");
+                    // ✅ Enhance keywords with industry-specific terms
+                    keywords = enhanceKeywordsWithIndustryContext(keywords, industryResult);
+                    logger.debug("✅ Keywords extrahiert und erweitert");
                 } catch (Exception e) {
                     logger.warn("⚠️ AI Keywords fehlgeschlagen, verwende Fallback: {}", e.getMessage());
                     keywords = generateFallbackKeywords(processedText);
@@ -264,58 +292,75 @@ public class DocumentController {
             if (options.isSuggestComponents()) {
                 try {
                     components = aiService.suggestComponents(processedText);
-                    logger.debug("✅ Components vorgeschlagen");
+                    // ✅ Enhance components with industry-specific suggestions
+                    components = enhanceComponentsWithIndustryContext(components, industryResult);
+                    logger.debug("✅ Components vorgeschlagen und erweitert");
                 } catch (Exception e) {
                     logger.warn("⚠️ AI Components fehlgeschlagen, verwende Fallback: {}", e.getMessage());
                     components = generateFallbackComponents(processedText);
                 }
             }
 
-            // 3. Document-Objekt erstellen und befüllen
+            // 4. Document-Objekt erstellen und befüllen
             Document document = new Document();
             document.setTitle(request.getTitle() != null ? request.getTitle() : "Direkt-Analyse");
-            document.setFilename(request.getTitle()); // Frontend-Kompatibilität
+            document.setFilename(request.getTitle());
             document.setFileType("text/plain");
             document.setContent(processedText);
             document.setSummary(summary);
             document.setKeywords(keywords);
             document.setSuggestedComponents(components);
             document.setUploadDate(new Date());
-            document.setDocumentType(detectDocumentType(processedText));
-            document.setComplexityLevel(calculateComplexity(preprocessResult));
-            document.setQualityScore(calculateQualityScore(preprocessResult));
 
-            // 4. Optional: Dokument speichern
+            // ✅ Industry Information in Document einbetten
+            String detectedIndustry = (String) industryResult.get("primaryIndustry");
+            document.setDocumentType(detectedIndustry);
+            document.setComplexityLevel(calculateComplexityWithIndustry(preprocessResult, detectedIndustry));
+            document.setQualityScore(calculateQualityScoreWithIndustry(preprocessResult, detectedIndustry));
+
+            // 5. Optional: Dokument speichern
             if (request.isSaveDocument()) {
                 try {
                     document = documentService.saveDocument(document);
                     logger.info("💾 Dokument gespeichert: id={}", document.getId());
                 } catch (Exception e) {
                     logger.warn("⚠️ Dokument-Speicherung fehlgeschlagen: {}", e.getMessage());
-                    // Weiter ohne Speicherung, aber Document behält temporäre ID
                 }
             }
 
-            // 5. Response erstellen
+            // 6. ✅ Enhanced Response mit Industry Analysis
+            Map<String, Object> enhancedMetadata = buildAnalysisMetadata(preprocessResult, document);
+            enhancedMetadata.put("industryAnalysis", industryResult);
+
+            // Add industry-specific recommendations
+            enhancedMetadata.put("industryRecommendations", generateIndustryRecommendations(detectedIndustry));
+
             AnalysisResponse resp = new AnalysisResponse(
                     document,
-                    "Text-Analyse erfolgreich",
-                    buildAnalysisMetadata(preprocessResult, document));
+                    "Text-Analyse mit Branchenerkennung erfolgreich",
+                    enhancedMetadata);
             resp.setProcessingTimeMs(java.time.Duration.between(t0, Instant.now()).toMillis());
 
-            logger.info("✅ Text-Analyse abgeschlossen in {}ms", resp.getProcessingTimeMs());
+            logger.info("✅ Text-Analyse abgeschlossen in {}ms - Industry: {} ({}%)",
+                    resp.getProcessingTimeMs(), detectedIndustry,
+                    industryResult.get("confidence"));
             return ResponseEntity.ok(resp);
 
         } catch (Exception e) {
             logger.error("❌ Kritischer Fehler bei Text-Analyse:", e);
 
-            // Graceful Degradation: Minimale Analyse mit Fallback
+            // Graceful Degradation mit Industry Fallback
             try {
                 Document fallbackDocument = createFallbackDocument(input, request);
+                Map<String, Object> fallbackMetadata = Map.of(
+                        "fallback", true,
+                        "originalError", e.getMessage(),
+                        "industryAnalysis", createFallbackIndustryResult());
+
                 AnalysisResponse fallbackResp = new AnalysisResponse(
                         fallbackDocument,
                         "Analyse mit Einschränkungen abgeschlossen: " + e.getMessage(),
-                        Map.of("fallback", true, "originalError", e.getMessage()));
+                        fallbackMetadata);
                 fallbackResp.setProcessingTimeMs(java.time.Duration.between(t0, Instant.now()).toMillis());
 
                 return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(fallbackResp);
@@ -329,6 +374,223 @@ public class DocumentController {
         }
     }
 
+    // ===================================
+    // NEUE INDUSTRY-INTEGRATION METHODEN
+    // ===================================
+
+    /**
+     * ✅ Fallback Industry Result für Fehlerbehandlung
+     */
+    private Map<String, Object> createFallbackIndustryResult() {
+        Map<String, Object> fallback = new HashMap<>();
+        fallback.put("primaryIndustry", "IT/Software");
+        fallback.put("confidence", 50.0);
+        fallback.put("detectionMethod", "Fallback");
+        fallback.put("enhancedAnalysis", false);
+        fallback.put("timestamp", System.currentTimeMillis());
+        fallback.put("topIndustries", List.of(
+                Map.of("industry", "IT/Software", "confidence", 50.0, "keywordScore", 25.0, "aiScore", 0.0)));
+        return fallback;
+    }
+
+    /**
+     * ✅ Manual Industry Result für explizite Auswahl
+     */
+    private Map<String, Object> createManualIndustryResult(String selectedIndustry) {
+        Map<String, Object> manual = new HashMap<>();
+        manual.put("primaryIndustry", selectedIndustry);
+        manual.put("confidence", 95.0); // Hohe Konfidenz bei manueller Auswahl
+        manual.put("detectionMethod", "Manual Selection");
+        manual.put("enhancedAnalysis", false);
+        manual.put("timestamp", System.currentTimeMillis());
+        manual.put("topIndustries", List.of(
+                Map.of("industry", selectedIndustry, "confidence", 95.0, "keywordScore", 0.0, "aiScore", 0.0)));
+        return manual;
+    }
+
+    /**
+     * ✅ Keywords mit Industry Context erweitern
+     */
+    private String enhanceKeywordsWithIndustryContext(String originalKeywords, Map<String, Object> industryResult) {
+        if (originalKeywords == null || industryResult == null) {
+            return originalKeywords;
+        }
+
+        String primaryIndustry = (String) industryResult.get("primaryIndustry");
+        Set<String> enhancedKeywords = new LinkedHashSet<>();
+
+        // Original Keywords hinzufügen
+        if (originalKeywords != null && !originalKeywords.trim().isEmpty()) {
+            enhancedKeywords.addAll(Arrays.asList(originalKeywords.split(","))
+                    .stream().map(String::trim).collect(Collectors.toList()));
+        }
+
+        // Industry-spezifische Keywords hinzufügen
+        Set<String> industryKeywords = getIndustrySpecificKeywords(primaryIndustry);
+        enhancedKeywords.addAll(industryKeywords);
+
+        // Auf 10 Keywords begrenzen für bessere Übersichtlichkeit
+        return enhancedKeywords.stream().limit(10).collect(Collectors.joining(", "));
+    }
+
+    /**
+     * ✅ Components mit Industry Context erweitern
+     */
+    private String enhanceComponentsWithIndustryContext(String originalComponents, Map<String, Object> industryResult) {
+        if (originalComponents == null || industryResult == null) {
+            return originalComponents;
+        }
+
+        String primaryIndustry = (String) industryResult.get("primaryIndustry");
+        Set<String> enhancedComponents = new LinkedHashSet<>();
+
+        // Original Components hinzufügen
+        if (originalComponents != null && !originalComponents.trim().isEmpty()) {
+            enhancedComponents.addAll(Arrays.asList(originalComponents.split(","))
+                    .stream().map(String::trim).collect(Collectors.toList()));
+        }
+
+        // Industry-spezifische Components hinzufügen
+        Set<String> industryComponents = getIndustrySpecificComponents(primaryIndustry);
+        enhancedComponents.addAll(industryComponents);
+
+        return enhancedComponents.stream().limit(8).collect(Collectors.joining(", "));
+    }
+
+    /**
+     * ✅ Industry-spezifische Keywords definieren
+     */
+    private Set<String> getIndustrySpecificKeywords(String industry) {
+        Map<String, Set<String>> industryKeywords = Map.of(
+                "IT/Software", Set.of("Microservices", "Cloud-Native", "DevOps", "Agile"),
+                "E-Commerce", Set.of("Conversion", "Payment Gateway", "Inventory", "Customer Experience"),
+                "Finanzwesen", Set.of("Compliance", "Security", "Real-time Processing", "Risk Management"),
+                "Gesundheitswesen", Set.of("HIPAA", "Patient Data", "Telemedicine", "Clinical Workflow"),
+                "Automotive", Set.of("Connected Car", "Autonomous", "IoT Sensors", "Real-time Analytics"));
+
+        return industryKeywords.getOrDefault(industry, Set.of("Digital Transformation", "Innovation"));
+    }
+
+    /**
+     * ✅ Industry-spezifische Components definieren
+     */
+    private Set<String> getIndustrySpecificComponents(String industry) {
+        Map<String, Set<String>> industryComponents = Map.of(
+                "IT/Software", Set.of("Spring Boot", "Angular", "PostgreSQL", "Docker"),
+                "E-Commerce", Set.of("Stripe API", "Inventory Management", "CDN", "Analytics"),
+                "Finanzwesen", Set.of("Payment Processing", "Fraud Detection", "KYC System", "Blockchain"),
+                "Gesundheitswesen", Set.of("FHIR API", "HL7 Integration", "Secure Messaging", "Audit Logging"),
+                "Automotive", Set.of("CAN Bus Integration", "OBD-II", "Fleet Management", "GPS Tracking"));
+
+        return industryComponents.getOrDefault(industry, Set.of("REST API", "Database", "Security Layer"));
+    }
+
+    /**
+     * ✅ Complexity-Berechnung mit Industry Context
+     */
+    private String calculateComplexityWithIndustry(TextPreprocessingService.PreprocessingResult result,
+            String industry) {
+        String baseComplexity = calculateComplexity(result);
+
+        // Industry-spezifische Anpassungen
+        if ("Finanzwesen".equals(industry) || "Gesundheitswesen".equals(industry)) {
+            // Finanz- und Gesundheitswesen haben höhere Compliance-Anforderungen
+            return upgradeComplexity(baseComplexity);
+        } else if ("Automotive".equals(industry)) {
+            // Automotive hat spezielle Hardware-Integration
+            return upgradeComplexity(baseComplexity);
+        }
+
+        return baseComplexity;
+    }
+
+    /**
+     * ✅ Quality Score mit Industry Context
+     */
+    private double calculateQualityScoreWithIndustry(TextPreprocessingService.PreprocessingResult result,
+            String industry) {
+        double baseScore = calculateQualityScore(result);
+
+        // Industry-spezifische Anpassungen
+        if ("IT/Software".equals(industry) && result != null && result.technicalTermCount > 5) {
+            // Bonus für technische Tiefe in IT-Projekten
+            baseScore += 10;
+        } else if ("Finanzwesen".equals(industry) || "Gesundheitswesen".equals(industry)) {
+            // Höhere Anforderungen für regulierte Branchen
+            baseScore *= 0.9;
+        }
+
+        return Math.min(100.0, Math.max(0.0, baseScore));
+    }
+
+    /**
+     * ✅ Industry-spezifische Empfehlungen generieren
+     */
+    private List<String> generateIndustryRecommendations(String industry) {
+        Map<String, List<String>> industryRecommendations = Map.of(
+                "IT/Software", List.of(
+                        "Implementieren Sie CI/CD für automatisierte Deployments",
+                        "Nutzen Sie Microservices für bessere Skalierbarkeit",
+                        "Setzen Sie auf Container-Technologien wie Docker",
+                        "Implementieren Sie umfassende Test-Automation"),
+                "E-Commerce", List.of(
+                        "Optimieren Sie die Conversion Rate durch A/B Testing",
+                        "Implementieren Sie Real-time Inventory Management",
+                        "Nutzen Sie CDN für bessere Performance",
+                        "Setzen Sie auf personalisierte Recommendations"),
+                "Finanzwesen", List.of(
+                        "Implementieren Sie PCI-DSS Compliance",
+                        "Nutzen Sie Real-time Fraud Detection",
+                        "Setzen Sie auf Multi-Factor Authentication",
+                        "Implementieren Sie umfassendes Audit Logging"),
+                "Gesundheitswesen", List.of(
+                        "Stellen Sie HIPAA Compliance sicher",
+                        "Implementieren Sie End-to-End Verschlüsselung",
+                        "Nutzen Sie FHIR Standards für Interoperabilität",
+                        "Setzen Sie auf sichere Patient Portal Lösungen"));
+
+        return industryRecommendations.getOrDefault(industry, List.of(
+                "Implementieren Sie Best Practices für Ihre Branche",
+                "Nutzen Sie moderne Technologien für bessere Effizienz",
+                "Setzen Sie auf skalierbare Architektur-Patterns"));
+    }
+
+    /**
+     * ✅ Hilfsmethode für Complexity Upgrade
+     */
+    private String upgradeComplexity(String currentComplexity) {
+        switch (currentComplexity) {
+            case "Einsteiger":
+                return "Fortgeschritten";
+            case "Fortgeschritten":
+                return "Experte";
+            default:
+                return currentComplexity;
+        }
+    }
+
+    // ===================================
+    // BESTEHENDE FALLBACK-METHODEN ERWEITERT
+    // ===================================
+
+    /**
+     * ✅ ERWEITERT: Fallback Document mit Industry Context
+     */
+    private Document createFallbackDocument(String input, TextAnalysisRequest request) {
+        Document doc = new Document();
+        doc.setTitle(request.getTitle() != null ? request.getTitle() : "Fallback-Analyse");
+        doc.setContent(input.length() > 1000 ? input.substring(0, 1000) + "..." : input);
+        doc.setSummary(generateFallbackSummary(input));
+        doc.setKeywords(generateFallbackKeywords(input));
+        doc.setSuggestedComponents(generateFallbackComponents(input));
+        doc.setUploadDate(new Date());
+        doc.setDocumentType("IT/Software"); // Standard Fallback
+        doc.setComplexityLevel("Einsteiger");
+        doc.setQualityScore(50.0);
+        doc.setFileType("text/plain");
+
+        return doc;
+    }
     // ================================
     // FALLBACK-METHODEN
     // ================================
@@ -418,25 +680,6 @@ public class DocumentController {
         }
 
         return components.stream().limit(8).collect(Collectors.joining(", ")) + " [Lokale Analyse]";
-    }
-
-    /**
-     * Erstellt ein minimales Document bei komplettem Fallback
-     */
-    private Document createFallbackDocument(String input, TextAnalysisRequest request) {
-        Document doc = new Document();
-        doc.setTitle(request.getTitle() != null ? request.getTitle() : "Fallback-Analyse");
-        doc.setContent(input.length() > 1000 ? input.substring(0, 1000) + "..." : input);
-        doc.setSummary(generateFallbackSummary(input));
-        doc.setKeywords(generateFallbackKeywords(input));
-        doc.setSuggestedComponents(generateFallbackComponents(input));
-        doc.setUploadDate(new Date());
-        doc.setDocumentType("Unbekannt");
-        doc.setComplexityLevel("Einsteiger");
-        doc.setQualityScore(50.0);
-        doc.setFileType("text/plain");
-
-        return doc;
     }
 
     /**
@@ -915,6 +1158,7 @@ public class DocumentController {
         private String title;
         private AnalysisOptions options;
         private boolean saveDocument = true;
+        private String selectedIndustry = "auto";
 
         public String getText() {
             return text;
@@ -946,6 +1190,14 @@ public class DocumentController {
 
         public void setSaveDocument(boolean saveDocument) {
             this.saveDocument = saveDocument;
+        }
+
+        public String getSelectedIndustry() {
+            return selectedIndustry;
+        }
+
+        public void setSelectedIndustry(String selectedIndustry) {
+            this.selectedIndustry = selectedIndustry;
         }
     }
 

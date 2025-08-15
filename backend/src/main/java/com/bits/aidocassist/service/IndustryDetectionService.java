@@ -34,98 +34,103 @@ public class IndustryDetectionService {
     private final Map<String, Map<String, Object>> inMemoryCache = new ConcurrentHashMap<>();
     private static final int MAX_CACHE_SIZE = 100;
 
+    // ---- Hilfsfunktion: dedupliziert und macht unveränderlich ----
+    private static Set<String> set(String... items) {
+        return Set.copyOf(new LinkedHashSet<>(Arrays.asList(items)));
+    }
+
     // 🔧 VERBESSERTE Branchendefinitionen mit präziseren Keywords
-    private static final Map<String, Set<String>> INDUSTRY_KEYWORDS = Map.of(
-        "IT/Software", Set.of(
+    // (nutzt set(...) statt Set.of(...), damit Duplikate kein Problem sind)
+    private static final Map<String, Set<String>> INDUSTRY_KEYWORDS = Map.ofEntries(
+        Map.entry("IT/Software", set(
             // Grundlegende IT-Begriffe
             "software", "entwicklung", "programmierung", "anwendung", "system", "plattform",
             "digital", "tech", "technisch", "it-projekt", "digitalisierung", "digital solutions",
-            
-            // Programmiersprachen & Frameworks  
+
+            // Programmiersprachen & Frameworks
             "java", "spring", "spring boot", "angular", "react", "vue", "typescript", "javascript",
             "python", "node.js", "express", "django", "laravel", ".net", "c#", "php",
-            
+
             // Datenbanken & Storage
             "postgresql", "mysql", "mongodb", "elasticsearch", "redis", "oracle", "sql server",
             "database", "datenbank", "nosql", "big data", "data warehouse",
-            
+
             // Cloud & DevOps
             "aws", "azure", "gcp", "cloud", "docker", "kubernetes", "jenkins", "gitlab",
             "ci/cd", "devops", "deployment", "container", "microservices", "serverless",
-            
+
             // Architektur & APIs
-            "rest", "api", "rest api", "microservice", "architektur", "design pattern", "mvc", 
+            "rest", "api", "rest api", "microservice", "architektur", "design pattern", "mvc",
             "spa", "saas", "paas", "iaas", "cloud-anwendung", "web-anwendung",
-            
+
             // Entwicklungstools
             "git", "github", "gitlab", "jira", "confluence", "maven", "gradle", "npm",
             "webpack", "testing", "junit", "cypress", "selenium", "sonarqube",
-            
+
             // IT-Sicherheit (spezifisch)
-            "oauth", "oauth2", "jwt", "keycloak", "authentication", "authorization", 
+            "oauth", "oauth2", "jwt", "keycloak", "authentication", "authorization",
             "spring security", "ssl", "tls", "security framework",
-            
+
             // Projekt-Begriffe
-            "tech-projekt", "software-projekt", "entwicklungsprojekt", "implementierung", 
+            "tech-projekt", "software-projekt", "entwicklungsprojekt", "implementierung",
             "integration", "migration", "upgrade", "refactoring", "code review"
-        ),
-        
-        "Finanzwesen", Set.of(
-            // Finanz-spezifische Begriffe (ohne generische Sicherheit)
+        )),
+
+        Map.entry("Finanzwesen", set(
             "bank", "banking", "fintech", "payment", "zahlung", "transaktion", "kredit",
             "versicherung", "trading", "börse", "aktien", "investment", "portfolio",
             "blockchain", "bitcoin", "kryptowährung", "wallet", "defi",
-            "risk management", "compliance", "pci dss", "basel", "mifid", "sepa", 
+            "risk management", "compliance", "pci dss", "basel", "mifid", "sepa",
             "swift", "iban", "financial services", "robo advisor", "peer-to-peer"
-        ),
-        
-        "Automotive", Set.of(
+        )),
+
+        Map.entry("Automotive", set(
             "auto", "fahrzeug", "kfz", "automotive", "mobility", "tesla", "bmw", "mercedes",
             "volkswagen", "audi", "porsche", "elektroauto", "hybrid", "verbrenner",
             "carsharing", "autonomous driving", "connected car", "automotive software"
-        ),
-        
-        "E-Commerce", Set.of(
-            "shop", "online", "ecommerce", "e-commerce", "zalando", "amazon", "otto", 
+        )),
+
+        Map.entry("E-Commerce", set(
+            "shop", "online", "ecommerce", "e-commerce", "zalando", "amazon", "otto",
             "retail", "verkauf", "webshop", "marketplace", "online-handel", "checkout",
             "payment gateway", "inventory", "logistics", "fulfillment"
-        ),
-        
-        "Pharma", Set.of(
+        )),
+
+        Map.entry("Pharma", set(
             "pharma", "medikament", "arzneimittel", "bayer", "merck", "boehringer",
             "pharmaceutical", "drug", "medicine", "clinical", "therapie", "biotech",
             "clinical trial", "fda", "ema", "drug discovery"
-        ),
-        
-        "Event/Marketing", Set.of(
-            "event", "marketing", "werbung", "messe", "promotion", "advertising", 
+        )),
+
+        Map.entry("Event/Marketing", set(
+            "event", "marketing", "werbung", "messe", "promotion", "advertising",
             "campaign", "brand", "veranstaltung", "social media", "influencer",
             "content marketing", "seo", "sem", "digital marketing"
-        ),
-        
-        "Gesundheitswesen", Set.of(
-            "gesundheit", "krankenhaus", "klinik", "arzt", "pflege", "healthcare", 
+        )),
+
+        Map.entry("Gesundheitswesen", set(
+            "gesundheit", "krankenhaus", "klinik", "arzt", "pflege", "healthcare",
             "medical", "hospital", "patient", "telemedicine", "health tech",
             "medical device", "diagnostics", "therapy"
-        ),
-        
-        "Bildung", Set.of(
-            "bildung", "schule", "universität", "lernen", "education", "university", 
+        )),
+
+        Map.entry("Bildung", set(
+            "bildung", "schule", "universität", "lernen", "education", "university",
             "learning", "training", "student", "e-learning", "lms", "mooc",
             "edtech", "online course", "distance learning"
-        ),
-        
-        "Energie", Set.of(
-            "energie", "strom", "gas", "öl", "solar", "wind", "energy", "power", 
+        )),
+
+        Map.entry("Energie", set(
+            "energie", "strom", "gas", "öl", "solar", "wind", "energy", "power",
             "renewable", "nachhaltigkeit", "smart grid", "energy management",
             "photovoltaik", "windkraft", "energiewende"
-        ),
-        
-        "Transport/Logistik", Set.of(
-            "transport", "logistik", "dhl", "ups", "fedex", "shipping", "delivery", 
+        )),
+
+        Map.entry("Transport/Logistik", set(
+            "transport", "logistik", "dhl", "ups", "fedex", "shipping", "delivery",
             "logistics", "spedition", "supply chain", "warehouse", "fleet management",
             "last mile", "freight", "cargo"
-        )
+        ))
     );
 
     /**
@@ -133,7 +138,7 @@ public class IndustryDetectionService {
      */
     public Map<String, Object> detectIndustry(String text) {
         log.info("Starting industry detection for text with {} characters", text.length());
-        
+
         try {
             // Check In-Memory Cache
             String cacheKey = generateCacheKey(text);
@@ -145,10 +150,10 @@ public class IndustryDetectionService {
 
             // Perform industry detection
             Map<String, Object> result = analyzeIndustryEnhanced(text);
-            
+
             // Cache the result (In-Memory)
             cacheResult(cacheKey, result);
-            
+
             log.info("Industry detection completed successfully");
             return result;
 
@@ -164,10 +169,10 @@ public class IndustryDetectionService {
     private Map<String, Object> analyzeIndustryEnhanced(String text) {
         // 1. Keyword-basierte Erkennung mit verbesserter Gewichtung
         Map<String, Double> keywordScores = analyzeKeywordsEnhanced(text);
-        
+
         // 2. Kontext-Analyse für bessere Genauigkeit
         Map<String, Double> contextEnhanced = enhanceWithContextAnalysis(text, keywordScores);
-        
+
         // 3. AI-basierte Erkennung (nur wenn API Key verfügbar)
         Map<String, Double> aiScores = new HashMap<>();
         if (isOpenAiConfigured()) {
@@ -177,10 +182,10 @@ public class IndustryDetectionService {
                 log.warn("AI analysis failed, using enhanced keywords only: {}", e.getMessage());
             }
         }
-        
+
         // 4. Kombiniere alle Ansätze
         Map<String, Double> finalScores = combineScoresEnhanced(contextEnhanced, aiScores);
-        
+
         // 5. Erstelle detailliertes Ergebnis
         return buildEnhancedIndustryResult(finalScores, keywordScores, aiScores, text);
     }
@@ -189,44 +194,47 @@ public class IndustryDetectionService {
      * 🔧 VERBESSERTE Keyword-Analyse mit präziser Gewichtung
      */
     private Map<String, Double> analyzeKeywordsEnhanced(String text) {
-        String normalizedText = text.toLowerCase();
+        String normalizedText = text.toLowerCase(Locale.ROOT);
         Map<String, Double> scores = new HashMap<>();
         Map<String, List<String>> matchedKeywords = new HashMap<>();
-        
+
         for (Map.Entry<String, Set<String>> industry : INDUSTRY_KEYWORDS.entrySet()) {
             double score = 0.0;
             List<String> matched = new ArrayList<>();
-            
+
             for (String keyword : industry.getValue()) {
                 if (normalizedText.contains(keyword)) {
                     matched.add(keyword);
-                    
+
                     // 🔧 VERBESSERTE Gewichtung nach Spezifität
                     double weight = calculateKeywordWeight(keyword, industry.getKey(), normalizedText);
                     score += weight;
                 }
             }
-            
+
             matchedKeywords.put(industry.getKey(), matched);
-            
+
             if (!matched.isEmpty()) {
                 // Bonus für hohe Keyword-Abdeckung
                 double coverage = (double) matched.size() / industry.getValue().size();
                 double coverageBonus = coverage > 0.3 ? coverage * 15 : 0;
-                
+
                 // Bonus für Keyword-Dichte
-                double density = (double) matched.size() / text.split("\\s+").length;
+                double wordCount = Math.max(1, text.split("\\s+").length);
+                double density = (double) matched.size() / wordCount;
                 double densityBonus = density > 0.05 ? density * 50 : 0;
-                
-                scores.put(industry.getKey(), score + coverageBonus + densityBonus);
-                
-                log.debug("Industry {}: {} keywords matched, score: {:.2f}", 
-                    industry.getKey(), matched.size(), scores.get(industry.getKey()));
+
+                double finalScore = score + coverageBonus + densityBonus;
+                scores.put(industry.getKey(), finalScore);
+
+                // ⚠️ SLF4J-Platzhalter statt "{:.2f}"
+                log.debug("Industry {}: {} keywords matched, score: {}",
+                        industry.getKey(), matched.size(), round2(finalScore));
             } else {
                 scores.put(industry.getKey(), 0.0);
             }
         }
-        
+
         return scores;
     }
 
@@ -236,39 +244,31 @@ public class IndustryDetectionService {
     private double calculateKeywordWeight(String keyword, String industry, String text) {
         // Basis-Gewichtung
         double weight = keyword.length() > 6 ? 2.0 : 1.5;
-        
+
         // IT/Software spezifische Gewichtung
         if ("IT/Software".equals(industry)) {
-            // Hochspezifische Tech-Keywords
-            if (Arrays.asList("spring boot", "angular", "postgresql", "kubernetes", 
-                             "docker", "elasticsearch", "microservices").contains(keyword)) {
+            if (Arrays.asList("spring boot", "angular", "postgresql", "kubernetes",
+                    "docker", "elasticsearch", "microservices").contains(keyword)) {
                 weight = 8.0;
-            }
-            // Sehr spezifische IT-Keywords  
-            else if (Arrays.asList("java", "typescript", "rest api", "oauth2", "jwt", 
-                                  "ci/cd", "devops", "gitlab").contains(keyword)) {
+            } else if (Arrays.asList("java", "typescript", "rest api", "oauth2", "jwt",
+                    "ci/cd", "devops", "gitlab").contains(keyword)) {
                 weight = 5.0;
-            }
-            // Moderately spezifische Keywords
-            else if (Arrays.asList("software", "entwicklung", "api", "cloud", 
-                                  "database", "git").contains(keyword)) {
+            } else if (Arrays.asList("software", "entwicklung", "api", "cloud",
+                    "database", "git").contains(keyword)) {
                 weight = 3.0;
-            }
-            // Strukturelle IT-Begriffe
-            else if (text.contains("tech-projekt") || text.contains("digital solutions")) {
+            } else if (text.contains("tech-projekt") || text.contains("digital solutions")) {
                 weight += 2.0;
             }
         }
-        
-        // Finanzwesen: Reduziere Gewichtung für generische Begriffe
+        // Finanzwesen
         else if ("Finanzwesen".equals(industry)) {
             if (Arrays.asList("fintech", "payment", "banking", "trading", "blockchain").contains(keyword)) {
                 weight = 5.0;
             } else if (keyword.equals("security") || keyword.equals("sicherheit")) {
-                weight = 0.5; // Sehr niedrig, da zu generisch
+                weight = 0.5; // sehr generisch
             }
         }
-        
+
         return weight;
     }
 
@@ -277,38 +277,33 @@ public class IndustryDetectionService {
      */
     private Map<String, Double> enhanceWithContextAnalysis(String text, Map<String, Double> keywordScores) {
         Map<String, Double> enhanced = new HashMap<>(keywordScores);
-        String lowerText = text.toLowerCase();
-        
+        String lowerText = text.toLowerCase(Locale.ROOT);
+
         // IT-Projekt Strukturerkennung
         if (isITProjectStructure(lowerText)) {
             enhanced.put("IT/Software", enhanced.getOrDefault("IT/Software", 0.0) + 20.0);
             log.debug("IT project structure detected, boosting IT/Software score");
         }
-        
+
         // Software-Projekt Phrasen
         if (containsSoftwareProjectPhrases(lowerText)) {
             enhanced.put("IT/Software", enhanced.getOrDefault("IT/Software", 0.0) + 15.0);
             log.debug("Software project phrases detected, boosting IT/Software score");
         }
-        
+
         // Tech-Stack Vollständigkeit
         if (hasCompleteTechStack(lowerText)) {
             enhanced.put("IT/Software", enhanced.getOrDefault("IT/Software", 0.0) + 25.0);
             log.debug("Complete tech stack detected, significant boost for IT/Software");
         }
-        
+
         // Reduziere andere Branchen wenn IT stark ist
         double itScore = enhanced.getOrDefault("IT/Software", 0.0);
         if (itScore > 40) {
-            enhanced.replaceAll((k, v) -> {
-                if (!"IT/Software".equals(k)) {
-                    return v * 0.4; // Reduziere andere Branchen um 60%
-                }
-                return v;
-            });
+            enhanced.replaceAll((k, v) -> !"IT/Software".equals(k) ? v * 0.4 : v);
             log.debug("Strong IT/Software signal detected, reducing other industries");
         }
-        
+
         return enhanced;
     }
 
@@ -316,18 +311,12 @@ public class IndustryDetectionService {
      * 🆕 Prüfung auf IT-Projekt Struktur
      */
     private boolean isITProjectStructure(String text) {
-        // Typische Sektionen eines IT-Projektdokuments
-        boolean hasArchitecture = text.contains("architektur") || text.contains("tech") || 
-                                 text.contains("technologie");
+        boolean hasArchitecture = text.contains("architektur") || text.contains("tech") || text.contains("technologie");
         boolean hasTechStack = text.contains("frontend") && text.contains("backend");
-        boolean hasImplementation = text.contains("entwicklung") || text.contains("deployment") || 
-                                   text.contains("implementierung");
-        boolean hasDevOps = text.contains("docker") || text.contains("kubernetes") || 
-                           text.contains("ci/cd");
-        
-        return (hasArchitecture && hasTechStack) || (hasTechStack && hasImplementation) || 
-               (hasArchitecture && hasDevOps);
-    }
+        boolean hasImplementation = text.contains("entwicklung") || text.contains("deployment") || text.contains("implementierung");
+        boolean hasDevOps = text.contains("docker") || text.contains("kubernetes") || text.contains("ci/cd");
+        return (hasArchitecture && hasTechStack) || (hasTechStack && hasImplementation) || (hasArchitecture && hasDevOps);
+        }
 
     /**
      * 🆕 Prüfung auf Software-Projekt Phrasen
@@ -338,7 +327,6 @@ public class IndustryDetectionService {
             "rest api", "web-anwendung", "dokumentenverwaltung", "ki-gestützt",
             "technisches projektdokument", "entwicklungsprojekt"
         );
-        
         return phrases.stream().anyMatch(text::contains);
     }
 
@@ -350,7 +338,6 @@ public class IndustryDetectionService {
         boolean hasBackend = text.contains("spring") || text.contains("express") || text.contains("django");
         boolean hasDatabase = text.contains("postgresql") || text.contains("mongodb") || text.contains("mysql");
         boolean hasCloud = text.contains("aws") || text.contains("azure") || text.contains("docker");
-        
         return hasFrontend && hasBackend && hasDatabase && hasCloud;
     }
 
@@ -359,27 +346,23 @@ public class IndustryDetectionService {
      */
     private Map<String, Double> combineScoresEnhanced(Map<String, Double> keywordScores, Map<String, Double> aiScores) {
         Map<String, Double> combined = new HashMap<>();
-        
         for (String industry : INDUSTRY_KEYWORDS.keySet()) {
             double keywordScore = keywordScores.getOrDefault(industry, 0.0);
             double aiScore = aiScores.getOrDefault(industry, 0.0);
-            
-            // Gewichtung: 80% Keywords (da verbessert), 20% AI
             double combinedScore = (keywordScore * 0.8) + (aiScore * 0.2);
             combined.put(industry, combinedScore);
         }
-        
         return combined;
     }
 
     /**
      * 🔧 VERBESSERTER Ergebnis-Builder mit Debug-Info
      */
-    private Map<String, Object> buildEnhancedIndustryResult(Map<String, Double> combinedScores, 
-                                                           Map<String, Double> keywordScores, 
-                                                           Map<String, Double> aiScores,
-                                                           String text) {
-        
+    private Map<String, Object> buildEnhancedIndustryResult(Map<String, Double> combinedScores,
+                                                            Map<String, Double> keywordScores,
+                                                            Map<String, Double> aiScores,
+                                                            String text) {
+
         // Sortiere nach Score
         List<Map.Entry<String, Double>> sortedIndustries = combinedScores.entrySet().stream()
             .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
@@ -387,7 +370,7 @@ public class IndustryDetectionService {
 
         // Top 3 Branchen (mit höherem Mindest-Score)
         List<Map<String, Object>> topIndustries = sortedIndustries.stream()
-            .filter(e -> e.getValue() != null && e.getValue() > 8.0) // Erhöhter Mindest-Score
+            .filter(e -> e.getValue() != null && e.getValue() > 8.0)
             .limit(3)
             .map(e -> {
                 Map<String, Object> industryMap = new HashMap<>();
@@ -400,11 +383,11 @@ public class IndustryDetectionService {
             .collect(Collectors.toList());
 
         // Hauptbranche bestimmen
-        String primaryIndustry = !topIndustries.isEmpty() ? 
-            (String) topIndustries.get(0).get("industry") : "Unbekannt";
-        
-        double confidence = !topIndustries.isEmpty() ? 
-            (Double) topIndustries.get(0).get("confidence") : 0.0;
+        String primaryIndustry = !topIndustries.isEmpty()
+            ? (String) topIndustries.get(0).get("industry") : "Unbekannt";
+
+        double confidence = !topIndustries.isEmpty()
+            ? (Double) topIndustries.get(0).get("confidence") : 0.0;
 
         // Debug-Informationen
         Map<String, Object> debug = new HashMap<>();
@@ -421,17 +404,15 @@ public class IndustryDetectionService {
         result.put("enhancedAnalysis", true);
         result.put("openAiConfigured", isOpenAiConfigured());
         result.put("timestamp", System.currentTimeMillis());
-        
-        // Debug nur im Development
+
         if (log.isDebugEnabled()) {
             result.put("debug", debug);
         }
 
-        // Logging für Überwachung
-        log.info("Industry Detection Result - Primary: {} ({}% confidence), Method: {}", 
-            primaryIndustry, Math.round(confidence), 
+        log.info("Industry Detection Result - Primary: {} ({}% confidence), Method: {}",
+            primaryIndustry, Math.round(confidence),
             aiScores.isEmpty() ? "Enhanced Keywords" : "Enhanced Keywords + AI");
-        
+
         return result;
     }
 
@@ -440,18 +421,18 @@ public class IndustryDetectionService {
      */
     private Map<String, List<String>> findMatchedKeywords(String text) {
         Map<String, List<String>> matched = new HashMap<>();
-        String lowerText = text.toLowerCase();
-        
+        String lowerText = text.toLowerCase(Locale.ROOT);
+
         for (Map.Entry<String, Set<String>> industry : INDUSTRY_KEYWORDS.entrySet()) {
             List<String> foundKeywords = industry.getValue().stream()
                 .filter(lowerText::contains)
                 .collect(Collectors.toList());
-            
+
             if (!foundKeywords.isEmpty()) {
                 matched.put(industry.getKey(), foundKeywords);
             }
         }
-        
+
         return matched;
     }
 
@@ -459,8 +440,8 @@ public class IndustryDetectionService {
      * 🆕 Hilfsmethode: Kontext-Faktoren analysieren
      */
     private Map<String, Boolean> analyzeContextFactors(String text) {
-        String lowerText = text.toLowerCase();
-        
+        String lowerText = text.toLowerCase(Locale.ROOT);
+
         Map<String, Boolean> factors = new HashMap<>();
         factors.put("hasITProjectStructure", isITProjectStructure(lowerText));
         factors.put("hasSoftwareProjectPhrases", containsSoftwareProjectPhrases(lowerText));
@@ -468,7 +449,7 @@ public class IndustryDetectionService {
         factors.put("hasArchitectureSection", lowerText.contains("architektur") || lowerText.contains("technologie"));
         factors.put("hasImplementationDetails", lowerText.contains("implementierung") || lowerText.contains("entwicklung"));
         factors.put("hasDevOpsElements", lowerText.contains("docker") || lowerText.contains("kubernetes") || lowerText.contains("ci/cd"));
-        
+
         return factors;
     }
 
@@ -483,9 +464,9 @@ public class IndustryDetectionService {
         try {
             String industries = String.join(", ", INDUSTRY_KEYWORDS.keySet());
             String prompt = String.format(
-                "Analysiere folgenden Text und bestimme die Wahrscheinlichkeit für jede Branche (0-100): %s\n\n" +
-                "Branchen: %s\n\n" +
-                "Text: %s\n\n" +
+                "Analysiere folgenden Text und bestimme die Wahrscheinlichkeit für jede Branche (0-100): %s%n%n" +
+                "Branchen: %s%n%n" +
+                "Text: %s%n%n" +
                 "Antworte nur mit: Branche1:Wahrscheinlichkeit, Branche2:Wahrscheinlichkeit, ...",
                 industries, industries, text.substring(0, Math.min(text.length(), 1500))
             );
@@ -534,7 +515,7 @@ public class IndustryDetectionService {
     @SuppressWarnings("unchecked")
     private String extractResponseText(Map<String, Object> responseBody) {
         List<Map<String, Object>> choices = (List<Map<String, Object>>) responseBody.get("choices");
-        
+
         if (choices != null && !choices.isEmpty()) {
             String result = (String) choices.get(0).get("text");
             if (result != null && !result.trim().isEmpty()) {
@@ -549,7 +530,7 @@ public class IndustryDetectionService {
      */
     private Map<String, Double> parseAIResponse(String response) {
         Map<String, Double> scores = new HashMap<>();
-        
+
         try {
             String[] pairs = response.split(",");
             for (String pair : pairs) {
@@ -557,7 +538,7 @@ public class IndustryDetectionService {
                 if (parts.length == 2) {
                     String industry = normalizeIndustryName(parts[0].trim());
                     double score = Double.parseDouble(parts[1].trim());
-                    
+
                     if (INDUSTRY_KEYWORDS.containsKey(industry)) {
                         scores.put(industry, Math.max(0, Math.min(100, score)));
                     }
@@ -566,7 +547,7 @@ public class IndustryDetectionService {
         } catch (Exception e) {
             log.warn("Failed to parse AI response: {}", e.getMessage());
         }
-        
+
         return scores;
     }
 
@@ -574,31 +555,31 @@ public class IndustryDetectionService {
      * Normalisiert Branchennamen (unverändert)
      */
     private String normalizeIndustryName(String aiIndustryName) {
-        String normalized = aiIndustryName.toLowerCase().trim();
-        
+        String normalized = aiIndustryName.toLowerCase(Locale.ROOT).trim();
+
         Map<String, String> mappings = Map.of(
             "automobil", "Automotive",
-            "pharmazeutisch", "Pharma", 
+            "pharmazeutisch", "Pharma",
             "e-commerce", "E-Commerce",
             "finanzen", "Finanzwesen",
             "gesundheit", "Gesundheitswesen",
             "technologie", "IT/Software",
             "it", "IT/Software"
         );
-        
+
         for (Map.Entry<String, String> mapping : mappings.entrySet()) {
             if (normalized.contains(mapping.getKey())) {
                 return mapping.getValue();
             }
         }
-        
+
         // Direkte Übereinstimmung
         for (String industry : INDUSTRY_KEYWORDS.keySet()) {
-            if (industry.toLowerCase().equals(normalized)) {
+            if (industry.toLowerCase(Locale.ROOT).equals(normalized)) {
                 return industry;
             }
         }
-        
+
         return aiIndustryName;
     }
 
@@ -608,15 +589,14 @@ public class IndustryDetectionService {
     private Map<String, Object> getFallbackIndustryAnalysis(String text) {
         Map<String, Double> keywordScores = analyzeKeywordsEnhanced(text);
         Map<String, Double> contextEnhanced = enhanceWithContextAnalysis(text, keywordScores);
-        
+
         String primaryIndustry = contextEnhanced.entrySet().stream()
             .max(Map.Entry.comparingByValue())
             .map(Map.Entry::getKey)
             .orElse("Unbekannt");
-            
+
         double confidence = Math.min(95.0, contextEnhanced.getOrDefault(primaryIndustry, 0.0));
 
-        // Top Industry für Response
         Map<String, Object> topIndustryMap = new HashMap<>();
         topIndustryMap.put("industry", primaryIndustry);
         topIndustryMap.put("confidence", confidence);
@@ -630,10 +610,10 @@ public class IndustryDetectionService {
         result.put("detectionMethod", "Enhanced Fallback (Keywords + Context)");
         result.put("enhancedAnalysis", true);
         result.put("timestamp", System.currentTimeMillis());
-        
-        log.info("Fallback analysis completed - Primary: {} ({}% confidence)", 
+
+        log.info("Fallback analysis completed - Primary: {} ({}% confidence)",
             primaryIndustry, Math.round(confidence));
-        
+
         return result;
     }
 
@@ -646,13 +626,10 @@ public class IndustryDetectionService {
 
     private void cacheResult(String cacheKey, Map<String, Object> result) {
         try {
-            // Cache-Größe begrenzen
             if (inMemoryCache.size() >= MAX_CACHE_SIZE) {
-                // Älteste Einträge entfernen (vereinfacht)
                 String oldestKey = inMemoryCache.keySet().iterator().next();
                 inMemoryCache.remove(oldestKey);
             }
-            
             inMemoryCache.put(cacheKey, result);
             log.debug("Cached result in memory for key: {}", cacheKey);
         } catch (Exception e) {
@@ -683,7 +660,7 @@ public class IndustryDetectionService {
         info.put("maxCacheSize", MAX_CACHE_SIZE);
         info.put("enhancedFeatures", Arrays.asList(
             "Improved IT/Software detection",
-            "Context-aware analysis", 
+            "Context-aware analysis",
             "Tech stack recognition",
             "Project structure detection"
         ));
